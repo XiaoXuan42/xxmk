@@ -154,3 +154,31 @@ int main() {
 	assert.Equal(t, 1, len(codeContent))
 	assert.Equal(t, codesnippt+"\n", codeContent[0])
 }
+
+func TestLink(t *testing.T) {
+	mk := `[hello](hello.com), this is a good image ![image](image.com)`
+	parser := GetBaseMKParser()
+	ast := parser.Parse(mk)
+
+	var linkType Link
+	var imageType Image
+	linkCnt, imageCnt := 0, 0
+	t.Logf("%s\n%s", mk, ast.String())
+	ast.root.PreVisit(func(node *AstNode) {
+		switch tp := node.Type.(type) {
+		case Link:
+			linkType = tp
+			linkCnt += 1
+		case Image:
+			imageType = tp
+			imageCnt += 1
+		default:
+		}
+	})
+	assert.Equal(t, 1, linkCnt)
+	assert.Equal(t, 1, imageCnt)
+	assert.Equal(t, "hello", linkType.name)
+	assert.Equal(t, "hello.com", linkType.link)
+	assert.Equal(t, "image", imageType.name)
+	assert.Equal(t, "image.com", imageType.link)
+}

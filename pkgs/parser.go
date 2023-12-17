@@ -300,7 +300,7 @@ func parseMath(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	if s[1] == '$' {
-		return nil  // $$ is not a valid inline math
+		return nil // $$ is not a valid inline math
 	}
 	newS := s[1:]
 	curCtx := ctx
@@ -328,6 +328,68 @@ func parseMath(s string, ctx parseContext) *AstNode {
 		LeftSibling: ctx.leftSibling,
 	}
 	return node
+}
+
+func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
+	if len(s) == 0 || s[0] != '[' {
+		return false, "", "", Pos{}
+	}
+	curPos := pos
+	newLineIdx := strings.Index(s, "\n")
+	rightIdx := strings.Index(s, "]")
+	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
+		return false, "", "", Pos{}
+	}
+	name := s[1:rightIdx]
+	curPos.ConsumeStr(s[:rightIdx+1])
+
+	newS := s[rightIdx+1:]
+	if len(newS) < 2 || newS[0] != '(' {
+		return false, "", "", Pos{}
+	}
+	newLineIdx = strings.Index(newS, "\n")
+	rightIdx = strings.Index(newS, ")")
+	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
+		return false, "", "", Pos{}
+	}
+	link := newS[1:rightIdx]
+	curPos.ConsumeStr(s[:rightIdx+1])
+	return true, name, link, curPos
+}
+
+func parseLink(s string, ctx parseContext) *AstNode {
+	ret, name, link, pos := _parseLinkLike(s, ctx.p)
+	if ret {
+		return &AstNode{
+			Type:        Link{name: name, link: link},
+			Start:       ctx.p,
+			End:         pos,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+	} else {
+		return nil
+	}
+}
+
+func parseImage(s string, ctx parseContext) *AstNode {
+	if len(s) < 1 && s[0] != '!' {
+		return nil
+	}
+	curPos := ctx.p
+	curPos.Consume(rune(s[0]))
+	ret, name, link, pos := _parseLinkLike(s[1:], ctx.p)
+	if ret {
+		return &AstNode{
+			Type:        Image{name: name, link: link},
+			Start:       ctx.p,
+			End:         pos,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+	} else {
+		return nil
+	}
 }
 
 type MKParser struct {
@@ -606,5 +668,7 @@ func GetBaseMKParser() MKParser {
 	parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseStrong)
 	parser.InlineParserSeq[rune('`')] = append(parser.InlineParserSeq[rune('`')], parseCode)
 	parser.InlineParserSeq[rune('$')] = append(parser.InlineParserSeq[rune('$')], parseMath)
+	parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseLink)
+	parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
 	return parser
 }

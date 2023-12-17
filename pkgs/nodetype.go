@@ -62,5 +62,23 @@ func (text Math) String() string {
 	return "Math"
 }
 
+type Link struct {
+	name string
+	link string
+}
+
+func (link Link) String() string {
+	return "Link"
+}
+
+type Image struct {
+	name string
+	link string
+}
+
+func (link Image) String() string {
+	return "Image"
+}
+
 // InlineAstNodeType
 type Emphasis struct{}
