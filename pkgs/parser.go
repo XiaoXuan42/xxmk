@@ -2,9 +2,13 @@ package xxmk
 
 import (
 	"log"
+	"strings"
 	"unicode/utf8"
 )
 
+/*
+ * Block should contain the last '\n' if it exists.
+ */
 type InlineParser func(string, parseContext) *AstNode
 type BlockParser func(string, parseContext) *AstNode
 type parseContext struct {
@@ -64,6 +68,105 @@ func parseHeader(s string, ctx parseContext) *AstNode {
 	node.End = ctx.p
 
 	return node
+}
+
+func _parseWithPrefix(s string, notation string, allowSuffix bool, pos Pos) (bool, Pos, Pos, string) {
+	if pos.Col != 0 {
+		log.Panicf("_parseWithPrefix should be invoked at the beginning of a line: %s", pos)
+		return false, Pos{}, Pos{}, ""
+	}
+	// two notation + '\n'
+	if len(s) < len(notation)*2+1 {
+		return false, Pos{}, Pos{}, ""
+	}
+	if s[:len(notation)] != notation {
+		return false, Pos{}, Pos{}, ""
+	}
+
+	curPos := pos
+	curPos.ConsumeStr(notation)
+	endPos := pos
+	found := false
+
+	newS := s[len(notation):]
+	newLineIdx := strings.Index(newS, "\n")
+	if newLineIdx < 0 {
+		return false, Pos{}, Pos{}, ""
+	}
+	if newLineIdx != 0 && !allowSuffix {
+		return false, Pos{}, Pos{}, ""
+	}
+	suffix := newS[:newLineIdx]
+	curPos.ConsumeStr(newS[:newLineIdx+1])
+
+	newS = newS[newLineIdx+1:]
+	for len(newS) > 0 {
+		if curPos.Col != 0 {
+			panic("The 'start of the line' invariance is broken")
+		}
+		if len(newS) < len(notation) {
+			return false, Pos{}, Pos{}, ""
+		}
+		newLineIdx = strings.Index(newS, "\n")
+		if newLineIdx < 0 {
+			if newS != notation {
+				return false, Pos{}, Pos{}, ""
+			}
+			curPos.ConsumeStr(newS)
+			endPos = curPos
+			found = true
+			break
+		} else {
+			if newS[:newLineIdx] == notation {
+				curPos.ConsumeStr(newS[:newLineIdx+1])
+				endPos = curPos
+				found = true
+				break
+			}
+			curPos.ConsumeStr(newS[:newLineIdx+1])
+			newS = newS[newLineIdx+1:]
+		}
+	}
+
+	if !found {
+		return false, Pos{}, Pos{}, suffix
+	}
+	if endPos.Offset <= pos.Offset {
+		panic("endPos should be after pos")
+	}
+	return true, pos, endPos, suffix
+}
+
+func parseMathBlock(s string, ctx parseContext) *AstNode {
+	ret, start, end, _ := _parseWithPrefix(s, "$$", true, ctx.p)
+	if ret {
+		node := &AstNode{
+			Type:        MathBlock{},
+			Start:       start,
+			End:         end,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+		return node
+	} else {
+		return nil
+	}
+}
+
+func parseCodeBlock(s string, ctx parseContext) *AstNode {
+	ret, start, end, suffix := _parseWithPrefix(s, "```", true, ctx.p)
+	if ret {
+		node := &AstNode{
+			Type:        CodeBlock{Suffix: suffix},
+			Start:       start,
+			End:         end,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+		return node
+	} else {
+		return nil
+	}
 }
 
 func parseStrong(s string, ctx parseContext) *AstNode {
@@ -180,26 +283,33 @@ func parseCode(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type: Code{},
-		Start: ctx.p,
-		End: curCtx.p,
-		Parent: ctx.parent,
+		Type:        Code{},
+		Start:       ctx.p,
+		End:         curCtx.p,
+		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
 	return node
 }
 
 func parseMath(s string, ctx parseContext) *AstNode {
-	if len(s) <= 2 { return nil }
-	if s[0] != '$' { return nil }
+	if len(s) <= 2 {
+		return nil
+	}
+	if s[0] != '$' {
+		return nil
+	}
+	if s[1] == '$' {
+		return nil  // $$ is not a valid inline math
+	}
 	newS := s[1:]
 	curCtx := ctx
 	curCtx.p.Consume(rune('$'))
 	foundEnd := false
-	for i, c := range(newS) {
+	for i, c := range newS {
 		curCtx.p.Consume(c)
 		if c == '$' {
-			if i + 1 >= len(newS) || newS[i+1] != '$' {
+			if i+1 >= len(newS) || newS[i+1] != '$' {
 				foundEnd = true
 				break
 			} else {
@@ -211,10 +321,10 @@ func parseMath(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type: Math{},
-		Start: ctx.p,
-		End: curCtx.p,
-		Parent: ctx.parent,
+		Type:        Math{},
+		Start:       ctx.p,
+		End:         curCtx.p,
+		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
 	return node
@@ -419,10 +529,11 @@ func (parser *MKParser) Parse(s string) Ast {
 		}
 	}
 
+	isNewLine := true
 	for {
 		for _, c := range s[ctx.p.Offset:] {
 			var subnode *AstNode
-			for j := len(parser.BlockParserSeq) - 1; j >= 0; j-- {
+			for j := len(parser.BlockParserSeq) - 1; isNewLine && (j >= 0); j-- {
 				blkParser := parser.BlockParserSeq[j]
 				if subnode = blkParser(s[ctx.p.Offset:], ctx); subnode != nil {
 					break
@@ -460,12 +571,17 @@ func (parser *MKParser) Parse(s string) Ast {
 					}
 					textNodeAdded = true
 				}
+				isNewLine = c == '\n'
 			}
 		}
 		fAddTextNode()
 		if ctx.p.Offset >= len(s) {
 			break
 		}
+		if ctx.p.Col != 0 {
+			panic("Bug: should parse to a new line here")
+		}
+		isNewLine = true
 	}
 
 	if ctx.p.Offset < len(s) {
@@ -479,6 +595,9 @@ func (parser *MKParser) Parse(s string) Ast {
 func GetBaseMKParser() MKParser {
 	parser := MKParser{}
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
+	parser.BlockParserSeq = append(parser.BlockParserSeq, parseCodeBlock)
+	parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
+
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	// strong first, italic second
 	parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseItalic)

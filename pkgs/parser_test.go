@@ -113,3 +113,44 @@ __nice to meet you!__`
 	assert.Equal(t, 0, mathStrs["$$world$"])
 	assert.Equal(t, 0, mathStrs["$world$$"])
 }
+
+func TestBlock1(t *testing.T) {
+	mathsnippt1 := `$$a
+a + b = 2
+$$`
+	mathsnippt2 := `$$
+e^{i\theta} = cos\theta + i sin\theta
+$$`
+	codesnippt := "```c++\n" + `#include<iostream>
+using namespace std;
+int main() {
+	return 0;
+}` + "\n```"
+
+	simplemk := mathsnippt1
+	simplemk += "\n" + codesnippt
+	simplemk += "\n" + mathsnippt2
+	parser := GetBaseMKParser()
+	ast := parser.Parse(simplemk)
+	var mathContent, codeContent []string
+	var codeSuffix []string
+
+	t.Logf("%s\n%s", simplemk, ast.String())
+	ast.root.PreVisit(func(node *AstNode) {
+		switch tp := node.Type.(type) {
+		case MathBlock:
+			mathContent = append(mathContent, simplemk[node.Start.Offset:node.End.Offset])
+		case CodeBlock:
+			codeSuffix = append(codeSuffix, tp.Suffix)
+			codeContent = append(codeContent, simplemk[node.Start.Offset:node.End.Offset])
+		default:
+		}
+	})
+	assert.Equal(t, 1, len(codeSuffix))
+	assert.Equal(t, "c++", codeSuffix[0])
+	assert.Equal(t, 2, len(mathContent))
+	assert.Equal(t, mathsnippt1+"\n", mathContent[0])
+	assert.Equal(t, mathsnippt2, mathContent[1])
+	assert.Equal(t, 1, len(codeContent))
+	assert.Equal(t, codesnippt+"\n", codeContent[0])
+}

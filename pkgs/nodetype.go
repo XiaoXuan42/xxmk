@@ -24,6 +24,20 @@ func (header Header) String() string {
 	return fmt.Sprintf("Header(%d)", header.Level)
 }
 
+type MathBlock struct {}
+
+func (math MathBlock) String() string {
+	return "MathBlock"
+}
+
+type CodeBlock struct {
+	Suffix string
+}
+
+func (code CodeBlock) String() string {
+	return fmt.Sprintf("CodeBlock(%s)", code.Suffix)
+}
+
 type Strong struct{}
 
 func (text Strong) String() string {
