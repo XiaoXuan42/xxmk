@@ -2,6 +2,7 @@ package xxmk
 
 import (
 	"log"
+	"unicode/utf8"
 )
 
 type InlineParser func(string, parseContext) *AstNode
@@ -18,7 +19,7 @@ func parseHeader(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	head := Header{Level: 0}
-	node := AstNode{
+	node := &AstNode{
 		Start:       ctx.p,
 		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
@@ -62,7 +63,7 @@ func parseHeader(s string, ctx parseContext) *AstNode {
 	node.Type = head
 	node.End = ctx.p
 
-	return &node
+	return node
 }
 
 func parseStrong(s string, ctx parseContext) *AstNode {
@@ -70,7 +71,7 @@ func parseStrong(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	symbol := s[0]
-	if symbol != '*' && symbol != '_' && symbol != s[1] {
+	if (symbol != '*' && symbol != '_') || symbol != s[1] {
 		return nil
 	}
 	lastSymbol := false
@@ -98,14 +99,125 @@ func parseStrong(s string, ctx parseContext) *AstNode {
 	if !foundEnd {
 		return nil
 	}
-	node := AstNode{
-		Type:        StrongText{},
+	node := &AstNode{
+		Type:        Strong{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
-	return &node
+	return node
+}
+
+func parseItalic(s string, ctx parseContext) *AstNode {
+	if len(s) <= 2 {
+		return nil
+	}
+	symbol := s[0]
+	if symbol != '*' && symbol != '_' {
+		return nil
+	}
+	foundEnd := false
+	curCtx := ctx
+	curCtx.p.Consume(rune(symbol))
+	for _, c := range s[1:] {
+		curCtx.p.Consume(c)
+		if c == rune(symbol) {
+			foundEnd = true
+			break
+		} else if c == '\n' {
+			break
+		}
+	}
+	if !foundEnd {
+		return nil
+	}
+	if curCtx.p.Offset <= ctx.p.Offset+2 {
+		// forbid empty italic
+		return nil
+	}
+	node := &AstNode{
+		Type:        Italic{},
+		Start:       ctx.p,
+		End:         curCtx.p,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
+}
+
+func parseCode(s string, ctx parseContext) *AstNode {
+	// multiple ` at the start/end will be the same as just one `
+	// multiple ` not at the start/end will be regarded as normal characters
+	if len(s) < 2 {
+		return nil
+	}
+	if s[0] != '`' {
+		return nil
+	}
+	curCtx := ctx
+	curCtx.p.Consume(rune('`'))
+	foundEnd := false
+	inSeq := true
+
+	newS := s[1:]
+	for i, c := range newS {
+		curCtx.p.Consume(c)
+		if c == '`' {
+			if inSeq {
+				continue
+			}
+			if i+1 >= len(newS) || !utf8.RuneStart(newS[i+1]) || newS[i+1] != '`' {
+				foundEnd = true
+				break
+			}
+			inSeq = true
+		} else {
+			inSeq = false
+		}
+	}
+	if !foundEnd {
+		return nil
+	}
+	node := &AstNode{
+		Type: Code{},
+		Start: ctx.p,
+		End: curCtx.p,
+		Parent: ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
+}
+
+func parseMath(s string, ctx parseContext) *AstNode {
+	if len(s) <= 2 { return nil }
+	if s[0] != '$' { return nil }
+	newS := s[1:]
+	curCtx := ctx
+	curCtx.p.Consume(rune('$'))
+	foundEnd := false
+	for i, c := range(newS) {
+		curCtx.p.Consume(c)
+		if c == '$' {
+			if i + 1 >= len(newS) || newS[i+1] != '$' {
+				foundEnd = true
+				break
+			} else {
+				return nil
+			}
+		}
+	}
+	if !foundEnd {
+		return nil
+	}
+	node := &AstNode{
+		Type: Math{},
+		Start: ctx.p,
+		End: curCtx.p,
+		Parent: ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
 }
 
 type MKParser struct {
@@ -368,7 +480,12 @@ func GetBaseMKParser() MKParser {
 	parser := MKParser{}
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
+	// strong first, italic second
+	parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseItalic)
+	parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseItalic)
 	parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseStrong)
 	parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseStrong)
+	parser.InlineParserSeq[rune('`')] = append(parser.InlineParserSeq[rune('`')], parseCode)
+	parser.InlineParserSeq[rune('$')] = append(parser.InlineParserSeq[rune('$')], parseMath)
 	return parser
 }

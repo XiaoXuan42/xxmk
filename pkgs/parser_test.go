@@ -23,7 +23,7 @@ sometexts...`
 	headerTot := 0
 	textCount := 0
 	textTotalLen := 0
-	ast.root.PreVisit(func (node *AstNode) {
+	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Text:
 			textTotalLen += node.End.Offset - node.Start.Offset
@@ -64,17 +64,34 @@ __hello_ world__
 __hello_world__
 __helloworld__
 __nice to meet you!__`
+	simplemk += "```good ` `job``` `` job`"
+	simplemk += "$hello$ $$world$ $world$$"
 	parser := GetBaseMKParser()
 	ast := parser.Parse(simplemk)
 	if ast.root.End.Line != 5 {
 		t.Fatalf("Wrong line count: %d", ast.root.End.Line)
 	}
 	strongStrs := map[string]int{}
+	italicStrs := map[string]int{}
+	codeStrs := map[string]int{}
+	mathStrs := map[string]int{}
+	t.Logf("%s", ast.String())
 	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
-		case StrongText:
-			t.Logf("%s %d", simplemk[node.Start.Offset:node.End.Offset], simplemk[node.End.Offset-1])
+		case Strong:
+			t.Logf("Strong: %s", simplemk[node.Start.Offset:node.End.Offset])
 			strongStrs[simplemk[node.Start.Offset+2:node.End.Offset-2]] += 1
+		case Italic:
+			t.Logf("Italic: %s", simplemk[node.Start.Offset:node.End.Offset])
+			italicStrs[simplemk[node.Start.Offset+1:node.End.Offset-1]] += 1
+		case Text:
+			t.Logf("Text: %s", simplemk[node.Start.Offset:node.End.Offset])
+		case Code:
+			t.Logf("Code: %s", simplemk[node.Start.Offset:node.End.Offset])
+			codeStrs[simplemk[node.Start.Offset:node.End.Offset]] += 1
+		case Math:
+			t.Logf("Math: %s", simplemk[node.Start.Offset:node.End.Offset])
+			mathStrs[simplemk[node.Start.Offset:node.End.Offset]] += 1
 		default:
 		}
 	})
@@ -86,4 +103,13 @@ __nice to meet you!__`
 	assert.Equal(t, 1, strongStrs["hello_world"])
 	assert.Equal(t, 1, strongStrs["nice to meet you!"])
 	assert.Equal(t, 0, strongStrs["hello_ world"])
+	assert.Equal(t, 1, italicStrs["hello"], 1)
+	assert.Equal(t, 0, italicStrs["helloworld"])
+	assert.Equal(t, 0, italicStrs["hello world"])
+	assert.Equal(t, 0, italicStrs["world"])
+	assert.Equal(t, 1, codeStrs["```good `"])
+	assert.Equal(t, 1, codeStrs["`job``` `` job`"])
+	assert.Equal(t, 1, mathStrs["$hello$"])
+	assert.Equal(t, 0, mathStrs["$$world$"])
+	assert.Equal(t, 0, mathStrs["$world$$"])
 }
