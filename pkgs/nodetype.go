@@ -36,7 +36,7 @@ func (code CodeBlock) String() string {
 	return fmt.Sprintf("CodeBlock(%s)", code.Suffix)
 }
 
-type HorizontalRule struct {}
+type HorizontalRule struct{}
 
 func (rule HorizontalRule) String() string {
 	return "HorizontalRule"
@@ -74,7 +74,7 @@ func (table Table) String() string {
 
 /* end Table */
 
-type QuoteBlock struct{
+type QuoteBlock struct {
 	Level int
 }
 
@@ -94,7 +94,7 @@ func (text Italic) String() string {
 	return "Italic"
 }
 
-type StrikeThrough struct {}
+type StrikeThrough struct{}
 
 func (text StrikeThrough) String() string {
 	return "StrikeThrough"
@@ -140,4 +140,21 @@ type Image struct {
 
 func (link Image) String() string {
 	return "Image"
+}
+
+type HtmlStartTag struct {
+	tag     string
+	content string
+}
+
+func (html HtmlStartTag) String() string {
+	return fmt.Sprintf("HtmlStartTag(%s)", html.tag)
+}
+
+type HtmlEndTag struct {
+	tag string
+}
+
+func (html HtmlEndTag) String() string {
+	return fmt.Sprintf("HtmlEndTag(%s)", html.tag)
 }

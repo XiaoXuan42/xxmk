@@ -846,6 +846,53 @@ func parseImage(s string, ctx parseContext) *AstNode {
 	}
 }
 
+func parseHtml(s string, ctx parseContext) *AstNode {
+	if len(s) < 2 || s[0] != '<' {
+		return nil
+	}
+	start := 1
+	isEnd := false
+	if s[1] == '/' {
+		start = 2
+		isEnd = true
+	}
+	tagEnd := _findInLine(s, ">")
+	if tagEnd < 0 {
+		return nil
+	}
+	insideTag := s[start:tagEnd]
+	if len(insideTag) == 0 {
+		return nil
+	}
+	var tag, content string
+	whitespace := _findInLine(insideTag, " ")
+	if whitespace < 0 {
+		tag = insideTag
+	} else {
+		tag = insideTag[:whitespace]
+		content = insideTag[whitespace+1:]
+	}
+	if len(tag) == 0 {
+		return nil
+	}
+	pos := ctx.p
+	pos.ConsumeStr(s[:tagEnd+1])
+	node := &AstNode {
+		Type: HtmlStartTag{ tag: tag, content: content },
+		Start: ctx.p,
+		End: pos,
+		Parent: ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	if isEnd {
+		if len(content) > 0 {
+			return nil
+		}
+		node.Type = HtmlEndTag{tag: tag}
+	}
+	return node
+}
+
 type MKParser struct {
 	BlockParserSeq  []BlockParser
 	InlineParserSeq map[rune][]InlineParser
@@ -1128,6 +1175,8 @@ func (parser *MKParser) addDefaultInlineParser(name string) {
 		parser.InlineParserSeq[rune('<')] = append(parser.InlineParserSeq[rune('<')], parseSimpleLink)
 	case "Image":
 		parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
+	case "Html":
+		parser.InlineParserSeq[rune('<')] = append(parser.InlineParserSeq[rune('<')], parseHtml)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1172,7 +1221,7 @@ func GetHtmlMKParser() MKParser {
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html",
 	})
 	return parser
 }
