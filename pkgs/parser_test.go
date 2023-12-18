@@ -157,29 +157,33 @@ int main() {
 
 func TestLink(t *testing.T) {
 	mk := `[hello](hello.com), this is a good image ![image](image.com)
-[![image](imagePath)](imageLink) [images\[good](imagelink)`
+[![image](imagePath)](imageLink) [images\[good](imagelink) <https://www.baidu.com> <link></link>
+<a><09@gmail.com>`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 
 	var linkType []Link
 	var linkNode []*AstNode
 	var imageType []Image
-	linkCnt, imageCnt := 0, 0
+	var simpleLinkType []SimpleLink
+	var simpleLinkNode []*AstNode
 	t.Logf("%s\n%s", mk, ast.String())
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Link:
 			linkNode = append(linkNode, node)
 			linkType = append(linkType, tp)
-			linkCnt += 1
 		case Image:
 			imageType = append(imageType, tp)
-			imageCnt += 1
+		case SimpleLink:
+			simpleLinkType = append(simpleLinkType, tp)
+			simpleLinkNode = append(simpleLinkNode, node)
 		default:
 		}
 	})
-	assert.Equal(t, 3, linkCnt)
-	assert.Equal(t, 2, imageCnt)
+	assert.Equal(t, 3, len(linkType))
+	assert.Equal(t, 2, len(imageType))
+	assert.Equal(t, 2, len(simpleLinkType))
 	assert.Equal(t, "hello", linkNode[0].Children[0].Text(mk))
 	assert.Equal(t, "hello.com", linkType[0].link)
 	assert.Equal(t, "image", imageType[0].name)
@@ -189,6 +193,10 @@ func TestLink(t *testing.T) {
 	assert.Equal(t, "image", imageType[1].name)
 	assert.Equal(t, "imagePath", imageType[1].link)
 	assert.Equal(t, `images\[good`, linkNode[2].Children[0].Text(mk))
+	assert.Equal(t, "https://www.baidu.com", simpleLinkType[0].link)
+	assert.Equal(t, "<https://www.baidu.com>", simpleLinkNode[0].Text(mk))
+	assert.Equal(t, "09@gmail.com", simpleLinkType[1].link)
+	assert.Equal(t, "<09@gmail.com>", simpleLinkNode[1].Text(mk))
 }
 
 func TestTable(t *testing.T) {

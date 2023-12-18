@@ -2,6 +2,8 @@ package xxmk
 
 import (
 	"log"
+	"net/mail"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 )
@@ -16,6 +18,42 @@ type parseContext struct {
 	parent      *AstNode
 	leftSibling *AstNode
 	parseText   func(string, parseContext) *AstNode
+}
+
+// strings.Index() that take escape symbol \ into account
+// pattern contains '\' is not supported
+func _findInLine(s string, pattern string) int {
+	if len(pattern) <= 0 || len(s) <= 0 {
+		return -1
+	}
+	if len(pattern) == 1 {
+		r := rune(pattern[0])
+		lastEscape := false
+		for i, c := range s {
+			if c == r && !lastEscape {
+				return i
+			}
+			if c == '\\' {
+				lastEscape = true
+			} else {
+				lastEscape = false
+			}
+		}
+		return -1
+	} else {
+		return strings.Index(s, pattern)
+	}
+}
+
+func _matchUrl(s string) bool {
+	urlRegex := regexp.MustCompile(`^\w+://[\w\.]+(:[0-9]+)?(/\w+)*(\?(\w+=\w+\&)*\w+=\w+)?(#\w+)?$`)
+	res := urlRegex.MatchString(s)
+	return res
+}
+
+func _matchEmail(s string) bool {
+	_, err := mail.ParseAddress(s)
+	return err == nil
 }
 
 /* Block parsers */
@@ -206,7 +244,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 			ctx.p.Consume('|')
 		}
 		for cur < len(s) {
-			curSep := strings.Index(s[cur:], "|")
+			curSep := _findInLine(s[cur:], "|")
 			var textStr string
 			nextP := ctx.p
 			if curSep < 0 {
@@ -583,10 +621,10 @@ func parseStrikeThrough(s string, ctx parseContext) *AstNode {
 	endPos := ctx.p
 	endPos.ConsumeStr(s[:end+1])
 	node := &AstNode{
-		Type: StrikeThrough{},
-		Start: ctx.p,
-		End: endPos,
-		Parent: ctx.parent,
+		Type:        StrikeThrough{},
+		Start:       ctx.p,
+		End:         endPos,
+		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
 	curCtx := ctx
@@ -703,7 +741,7 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 		}
 		if !lastEscape && c == '[' {
 			leftBracketMet += 1
-		} 
+		}
 		if !lastEscape && c == ']' {
 			if leftBracketMet == 0 {
 				rightIdx = i + 1 // don't omit the [ at the beginning
@@ -728,7 +766,7 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 		return false, "", "", Pos{}
 	}
 	newLineIdx = strings.Index(newS, "\n")
-	rightIdx = strings.Index(newS, ")")
+	rightIdx = _findInLine(newS, ")")
 	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
 		return false, "", "", Pos{}
 	}
@@ -751,12 +789,37 @@ func parseLink(s string, ctx parseContext) *AstNode {
 		curCtx.leftSibling = nil
 		curCtx.parent = node
 		curCtx.p.Consume('[')
-		log.Printf("parse Link: %s", name)
 		textnode := ctx.parseText(name, curCtx)
 		if textnode == nil {
 			log.Panicf("Failed to parse link %s", s)
 		}
 		node.Children = append(node.Children, textnode)
+		return node
+	} else {
+		return nil
+	}
+}
+
+func parseSimpleLink(s string, ctx parseContext) *AstNode {
+	if len(s) <= 2 || s[0] != '<' {
+		return nil
+	}
+	rightIdx := _findInLine(s, ">")
+
+	if rightIdx <= 0 {
+		return nil
+	}
+	link := s[1:rightIdx]
+	if _matchUrl(link) || _matchEmail(link) {
+		endPos := ctx.p
+		endPos.ConsumeStr(s[:rightIdx+1])
+		node := &AstNode{
+			Type:        SimpleLink{link: link},
+			Start:       ctx.p,
+			End:         endPos,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
 		return node
 	} else {
 		return nil
@@ -1061,6 +1124,8 @@ func (parser *MKParser) addDefaultInlineParser(name string) {
 		parser.InlineParserSeq[rune('$')] = append(parser.InlineParserSeq[rune('$')], parseMath)
 	case "Link":
 		parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseLink)
+	case "SimpleLink":
+		parser.InlineParserSeq[rune('<')] = append(parser.InlineParserSeq[rune('<')], parseSimpleLink)
 	case "Image":
 		parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
 	default:
@@ -1107,7 +1172,7 @@ func GetHtmlMKParser() MKParser {
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "Image",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image",
 	})
 	return parser
 }

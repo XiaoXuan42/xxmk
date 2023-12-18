@@ -112,6 +112,8 @@ func (text Math) String() string {
 	return "Math"
 }
 
+/* Link */
+// [title](link)
 type Link struct {
 	link string
 }
@@ -119,6 +121,17 @@ type Link struct {
 func (link Link) String() string {
 	return "Link"
 }
+
+// <link> link is url or email address
+type SimpleLink struct {
+	link string
+}
+
+func (link SimpleLink) String() string {
+	return "SimpleLink"
+}
+
+/* end link */
 
 type Image struct {
 	name string
