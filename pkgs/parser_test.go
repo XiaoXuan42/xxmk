@@ -313,3 +313,60 @@ func TestStrikeThrough(t *testing.T) {
 	assert.Equal(t, 1, len(collects))
 	assert.Equal(t, "nice to ~ ~ meet you!", collects[0])
 }
+
+func TestList(t *testing.T) {
+	mk := `- item1
+- item2
+- item3
+1.    item4
+- item5
+3. item6
+6. item7`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+	t.Logf(ast.String())
+	assert.Equal(t, 4, len(ast.root.Children))
+	lst1 := ast.root.Children[0]
+	lst2 := ast.root.Children[1]
+	lst3 := ast.root.Children[2]
+	lst4 := ast.root.Children[3]
+	assert.Equal(t, false, lst1.Type.(List).IsOrdered)
+	assert.Equal(t, 3, len(lst1.Children))
+	itemNames := []string{ " item1", " item2", " item3" }
+	for i, ch := range(lst1.Children) {
+		assert.Equal(t, 1, len(ch.Children))
+		assert.Equal(t, "Text", ch.Children[0].Type.String())
+		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
+	}
+
+	assert.Equal(t, true, lst2.Type.(List).IsOrdered)
+	assert.Equal(t, 1, len(lst2.Children))
+	itemNames = []string{ "    item4" }
+	orders := []int {1}
+	for i, ch := range(lst2.Children) {
+		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
+		assert.Equal(t, 1, len(ch.Children))
+		assert.Equal(t, "Text", ch.Children[0].Type.String())
+		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
+	}
+
+	assert.Equal(t, false, lst3.Type.(List).IsOrdered)
+	assert.Equal(t, 1, len(lst3.Children))
+	itemNames = []string{ " item5" }
+	for i, ch := range(lst3.Children) {
+		assert.Equal(t, 1, len(ch.Children))
+		assert.Equal(t, "Text", ch.Children[0].Type.String())
+		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
+	}
+
+	assert.Equal(t, true, lst4.Type.(List).IsOrdered)
+	assert.Equal(t, 2, len(lst4.Children))
+	itemNames = []string{ " item6", " item7" }
+	orders = []int {3, 4}
+	for i, ch := range(lst4.Children) {
+		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
+		assert.Equal(t, 1, len(ch.Children))
+		assert.Equal(t, "Text", ch.Children[0].Type.String())
+		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
+	}
+}

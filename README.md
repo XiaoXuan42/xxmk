@@ -35,7 +35,7 @@ x_1^2
 ```
 - Url/email address match may be wrong for links due to the wrong regexpr.
 - Html tag is parsed to a token, there won't be a DOM tree in the final AST.
-
+- Unordered list must start with `-` symbol.
 
 ## Roadmap
 - [ ] Nested block by identation

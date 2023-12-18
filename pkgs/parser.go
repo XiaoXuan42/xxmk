@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -511,6 +512,124 @@ func parseHorizontalRule(s string, ctx parseContext) *AstNode {
 	return node
 }
 
+func parseList(s string, ctx parseContext) *AstNode {
+	if len(s) == 0 {
+		return nil
+	}
+
+	fParseListLine := func(s string, ctx parseContext) *AstNode {
+		// return: ListItem astnode, isOrdered
+		if len(s) == 0 {
+			return nil
+		}
+		itemType := ListItem{ Order: 1 }
+		node := &AstNode{
+			Type:        ListItem{},
+			Start:       ctx.p,
+			End:         ctx.p,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+		start := 1
+		if s[0] != '-' {
+			dotPos := _findInLine(s, ".")
+			if dotPos <= 0 {
+				return nil
+			}
+			order, err := strconv.Atoi(s[:dotPos])
+			if err != nil {
+				return nil
+			}
+			start = dotPos + 1
+			itemType.Order = order
+			itemType.IsOrdered = true
+		}
+		node.End.ConsumeStr(s[:start])
+		contentStart := node.End
+		node.Type = itemType
+
+		lineBrk := -1
+		text := ""
+		if start < len(s) && s[start] != ' ' && s[start] != '\n' {
+			return nil
+		}
+		if start < len(s) {
+			lineBrk = strings.Index(s[start:], "\n")
+			if lineBrk < 0 {
+				text = s[start:]
+				node.End.ConsumeStr(s[start:])
+			} else {
+				text = s[start:lineBrk+start]
+				node.End.ConsumeStr(s[start:lineBrk+start+1])
+			}
+		}
+		curCtx := ctx
+		curCtx.p = contentStart
+		curCtx.parent = node
+		curCtx.leftSibling = nil
+		var textnode *AstNode
+		if len(text) == 0 {
+			textnode = &AstNode{
+				Type:        Text{},
+				Start:       curCtx.p,
+				End:         curCtx.p,
+				Parent:      node,
+				LeftSibling: nil,
+			}
+		} else {
+			textnode = ctx.parseText(text, curCtx)
+		}
+		node.Children = append(node.Children, textnode)
+		return node
+	}
+
+	listType := List{}
+	listnode := &AstNode{
+		Type:        List{},
+		Start:       ctx.p,
+		End:         ctx.p,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	curCtx := ctx
+	curCtx.parent = listnode
+	curCtx.leftSibling = nil
+
+	fstListItem := fParseListLine(s, curCtx)
+	if fstListItem == nil {
+		return nil
+	}
+	curOrder := fstListItem.Type.(ListItem).Order + 1
+	listType.IsOrdered = fstListItem.Type.(ListItem).IsOrdered
+	listnode.Type = listType
+	listnode.Children = append(listnode.Children, fstListItem)
+	curCtx.leftSibling = fstListItem
+	curCtx.p = fstListItem.End
+
+	curIdx := curCtx.p.Offset - ctx.p.Offset
+	for curIdx < len(s) {
+		lstItem := fParseListLine(s[curIdx:], curCtx)
+
+		if lstItem == nil {
+			break
+		} else if lstItem.Type.(ListItem).IsOrdered != listType.IsOrdered {
+			break
+		} else {
+			lstItemType := lstItem.Type.(ListItem)
+			lstItemType.Order = curOrder
+			lstItem.Type = lstItemType
+
+			curCtx.p = lstItem.End
+			curCtx.leftSibling = lstItem
+			curIdx = curCtx.p.Offset - ctx.p.Offset
+			curOrder += 1
+			listnode.Children = append(listnode.Children, lstItem)
+		}
+	}
+	listnode.End = curCtx.p
+	return listnode
+}
+
 /* Inline parsers */
 func parseEmphasis(s string, ctx parseContext) *AstNode {
 	if len(s) < 4 {
@@ -877,11 +996,11 @@ func parseHtml(s string, ctx parseContext) *AstNode {
 	}
 	pos := ctx.p
 	pos.ConsumeStr(s[:tagEnd+1])
-	node := &AstNode {
-		Type: HtmlStartTag{ tag: tag, content: content },
-		Start: ctx.p,
-		End: pos,
-		Parent: ctx.parent,
+	node := &AstNode{
+		Type:        HtmlStartTag{tag: tag, content: content},
+		Start:       ctx.p,
+		End:         pos,
+		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
 	if isEnd {
@@ -1203,6 +1322,8 @@ func (parser *MKParser) addDefaultBlockParser(name string) {
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)
 	case "HorizontalRule":
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseHorizontalRule)
+	case "List":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseList)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1217,7 +1338,7 @@ func (parser *MKParser) addDefaultBlockParsers(names []string) {
 func GetHtmlMKParser() MKParser {
 	parser := MKParser{}
 	parser.addDefaultBlockParsers([]string{
-		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table",
+		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table", "List",
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{

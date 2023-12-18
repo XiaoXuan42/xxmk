@@ -82,6 +82,27 @@ func (quote QuoteBlock) String() string {
 	return "QuoteBlock"
 }
 
+/* List */
+type List struct {
+	IsOrdered bool
+}
+
+type ListItem struct {
+	IsOrdered bool
+	Order     int
+}
+
+func (list List) String() string {
+	return "List"
+}
+
+func (item ListItem) String() string {
+	return fmt.Sprintf("ListItem(%d)", item.Order)
+}
+
+/* end List */
+
+/****** inline ast nodes ******/
 type Emphasis struct{}
 
 func (text Emphasis) String() string {
