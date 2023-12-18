@@ -169,6 +169,217 @@ func parseCodeBlock(s string, ctx parseContext) *AstNode {
 	}
 }
 
+func parseTable(s string, ctx parseContext) *AstNode {
+	type LineResult struct {
+		valid     bool
+		hasOrMark bool
+		sep       int
+		start     Pos
+		end       Pos
+		texts     []*AstNode
+	}
+
+	parseTableLine := func(s string, ctx parseContext) LineResult {
+		result := LineResult{start: ctx.p, end: ctx.p}
+
+		sep := strings.Index(s, "\n")
+
+		isTailNewLine := false
+		if sep == 0 {
+			return result
+		} else if sep < 0 {
+			sep = len(s)
+			result.end.ConsumeStr(s)
+			result.sep = sep
+		} else {
+			isTailNewLine = true
+			result.end.ConsumeStr(s[:sep+1])
+			s = s[:sep]
+			result.sep = sep + 1
+		}
+
+		cur := 0
+		if s[0] == '|' {
+			cur = 1
+			result.hasOrMark = true
+			ctx.p.Consume('|')
+		}
+		for ; cur < len(s); {
+			curSep := strings.Index(s[cur:], "|")
+			var textStr string
+			nextP := ctx.p
+			if curSep < 0 {
+				curSep = sep
+				textStr = s[cur:]
+				nextP.ConsumeStr(s[cur:])
+			} else {
+				curSep += cur
+				result.hasOrMark = true
+				textStr = s[cur:curSep]
+				nextP.ConsumeStr(s[cur : curSep+1])
+			}
+
+			leadingSpace, tailingSpace := 0, len(textStr)-1
+			for ; leadingSpace < len(textStr); leadingSpace++ {
+				if textStr[leadingSpace] != ' ' {
+					break
+				}
+				ctx.p.Consume(' ')
+			}
+			for ; tailingSpace >= 0; tailingSpace-- {
+				if textStr[tailingSpace] != ' ' {
+					break
+				}
+			}
+			var curText *AstNode
+			if tailingSpace < leadingSpace {
+				curText = &AstNode{
+					Type:        Text{},
+					Start:       ctx.p,
+					End:         ctx.p,
+					Parent:      ctx.parent,
+					LeftSibling: ctx.leftSibling,
+				}
+			} else {
+				curText = ctx.parseText(textStr[leadingSpace:tailingSpace+1], ctx)
+			}
+			if curText == nil {
+				log.Panicf("Failed to parse table line: %s", s)
+			}
+			ctx.leftSibling = curText
+			ctx.p = nextP
+			result.texts = append(result.texts, curText)
+			cur = curSep + 1
+		}
+		if isTailNewLine {
+			ctx.p.Consume('\n')
+		}
+		result.valid = true
+		if result.end != ctx.p {
+			log.Panicf("Should agree on the end position: %s, %s", result.end.String(), ctx.p.String())
+		}
+		endSep := result.end.Offset - result.start.Offset
+		if endSep != result.sep {
+			log.Panicf("End and sep should agree on the end position: %d, %d", endSep, result.sep)
+		}
+		return result
+	}
+
+	tableNode := &AstNode{
+		Type:        Table{},
+		Start:       ctx.p,
+		End:         ctx.p,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	curCtx := ctx
+	curCtx.parent = tableNode
+	curCtx.leftSibling = nil
+	curRear := 0
+
+	headerNode := &AstNode{
+		Type:        TableHead{},
+		Start:       curCtx.p,
+		End:         curCtx.p,
+		Parent:      curCtx.parent,
+		LeftSibling: curCtx.leftSibling,
+	}
+	curCtx.parent = headerNode
+	curCtx.leftSibling = nil
+
+	headResult := parseTableLine(s, curCtx)
+	if !headResult.valid || !headResult.hasOrMark {
+		return nil
+	}
+	headerNode.Children = append(headerNode.Children, headResult.texts...)
+	headerNode.End = headResult.end
+	curCtx.p = headResult.end
+	curRear = headResult.sep
+	if curRear >= len(s) {
+		return nil
+	}
+
+	alignType := TableAlign{}
+	alignNode := &AstNode{
+		Type:        TableAlign{},
+		Start:       curCtx.p,
+		End:         curCtx.p,
+		Parent:      tableNode,
+		LeftSibling: headerNode,
+	}
+	curCtx.parent = alignNode
+	curCtx.leftSibling = nil
+	alignResult := parseTableLine(s[curRear:], curCtx)
+	if !alignResult.valid || len(alignResult.texts) != len(headResult.texts) {
+		return nil
+	}
+	// convert texts to aligns
+	for _, textnode := range alignResult.texts {
+		startOff := textnode.Start.Offset - ctx.p.Offset
+		endOff := textnode.End.Offset - ctx.p.Offset
+		sAlign := s[startOff:endOff]
+		isLeft, isRight := false, false
+		if len(sAlign) == 0 {
+			return nil
+		} else if len(sAlign) == 1 && sAlign[0] != '-' {
+			return nil
+		} else {
+			if sAlign[0] == ':' {
+				isLeft = true
+				if sAlign[1] != '-' {
+					return nil
+				}
+			}
+			if sAlign[len(sAlign)-1] == ':' {
+				isRight = true
+			}
+			if isLeft && isRight {
+				alignType.aligns = append(alignType.aligns, AlignMiddle)
+			} else if isRight {
+				alignType.aligns = append(alignType.aligns, AlignRight)
+			} else {
+				alignType.aligns = append(alignType.aligns, AlignLeft)
+			}
+		}
+	}
+	alignNode.Type = alignType
+	alignNode.End = alignResult.end
+	curCtx.p = alignResult.end
+	curRear += alignResult.sep
+
+	curCtx.parent = tableNode
+	curCtx.leftSibling = alignNode
+	lineNodes := []*AstNode{}
+	for curRear < len(s) {
+		if s[curRear] == '\n' {
+			curCtx.p.Consume('\n')
+			break
+		}
+		lineNode := &AstNode{
+			Type:        TableLine{},
+			Start:       curCtx.p,
+			End:         curCtx.p,
+			Parent:      tableNode,
+			LeftSibling: curCtx.leftSibling,
+		}
+		lineResult := parseTableLine(s[curRear:], curCtx)
+		if !lineResult.valid {
+			return nil
+		}
+		lineNode.Children = append(lineNode.Children, lineResult.texts...)
+		lineNode.End = lineResult.end
+		curCtx.p = lineResult.end
+		curCtx.leftSibling = lineNode
+		curRear += lineResult.sep
+		lineNodes = append(lineNodes, lineNode)
+	}
+	tableNode.Children = append(tableNode.Children, headerNode)
+	tableNode.Children = append(tableNode.Children, alignNode)
+	tableNode.Children = append(tableNode.Children, lineNodes...)
+	tableNode.End = curCtx.p
+	return tableNode
+}
+
 func parseStrong(s string, ctx parseContext) *AstNode {
 	if len(s) < 4 {
 		return nil
@@ -659,6 +870,7 @@ func GetBaseMKParser() MKParser {
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseCodeBlock)
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
+	parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)
 
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	// strong first, italic second

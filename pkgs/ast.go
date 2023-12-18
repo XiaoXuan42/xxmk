@@ -107,6 +107,10 @@ func (astnode *AstNode) PreVisit(f func (*AstNode)) {
 	}
 }
 
+func (astnode *AstNode) Text(s string) string {
+	return s[astnode.Start.Offset:astnode.End.Offset]
+}
+
 func (ast *Ast) String() string {
 	if ast == nil {
 		return "None"

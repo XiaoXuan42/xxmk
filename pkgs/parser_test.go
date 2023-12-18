@@ -182,3 +182,45 @@ func TestLink(t *testing.T) {
 	assert.Equal(t, "image", imageType.name)
 	assert.Equal(t, "image.com", imageType.link)
 }
+
+func TestTable(t *testing.T) {
+	mk := `|  hello |  world| |
+|:--: | --: | -- |
+abc
+|d | e   | f|
+| g |  |  i`
+	parser := GetBaseMKParser()
+	ast := parser.Parse(mk)
+	assert.Equal(t, 1, len(ast.root.Children))
+	assert.Equal(t, "Table", ast.root.Children[0].Type.String())
+	assert.Equal(t, 5, len(ast.root.Children[0].Children))
+	headerNode := ast.root.Children[0].Children[0]
+	alignNode := ast.root.Children[0].Children[1]
+	lineNodes := ast.root.Children[0].Children[2:]
+	assert.Equal(t, "TableHead", headerNode.Type.String())
+	assert.Equal(t, 3, len(headerNode.Children))
+	assert.Equal(t, "hello", headerNode.Children[0].Text(mk))
+	assert.Equal(t, "world", headerNode.Children[1].Text(mk))
+	assert.Equal(t, "", headerNode.Children[2].Text(mk))
+
+	assert.Equal(t, "TableAlign", alignNode.Type.String())
+	tbAlign := alignNode.Type.(TableAlign)
+	assert.Equal(t, 3, len(tbAlign.aligns))
+	assert.Equal(t, AlignMiddle, tbAlign.aligns[0])
+	assert.Equal(t, AlignRight, tbAlign.aligns[1])
+	assert.Equal(t, AlignLeft, tbAlign.aligns[2])
+
+	line0 := lineNodes[0]
+	assert.Equal(t, 1, len(line0.Children))
+	assert.Equal(t, "abc", line0.Children[0].Text(mk))
+	line1 := lineNodes[1]
+	assert.Equal(t, 3, len(line1.Children))
+	assert.Equal(t, "d", line1.Children[0].Text(mk))
+	assert.Equal(t, "e", line1.Children[1].Text(mk))
+	assert.Equal(t, "f", line1.Children[2].Text(mk))
+	line2 := lineNodes[2]
+	assert.Equal(t, 3, len(line2.Children))
+	assert.Equal(t, "g", line2.Children[0].Text(mk))
+	assert.Equal(t, "", line2.Children[1].Text(mk))
+	assert.Equal(t, "i", line2.Children[2].Text(mk))
+}

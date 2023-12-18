@@ -38,6 +38,38 @@ func (code CodeBlock) String() string {
 	return fmt.Sprintf("CodeBlock(%s)", code.Suffix)
 }
 
+/* Table */
+const (
+	AlignLeft = iota
+	AlignMiddle
+	AlignRight
+)
+
+type TableHead struct {}
+type TableAlign struct {
+	aligns []int
+}
+type TableLine struct {}
+type Table struct {}
+
+func (head TableHead) String() string {
+	return "TableHead"
+}
+
+func (align TableAlign) String() string {
+	return "TableAlign"
+}
+
+func (line TableLine) String() string {
+	return "TableLine"
+}
+
+func (table Table) String() string {
+	return "Table"
+}
+
+/* end Table */
+
 type Strong struct{}
 
 func (text Strong) String() string {
@@ -79,6 +111,3 @@ type Image struct {
 func (link Image) String() string {
 	return "Image"
 }
-
-// InlineAstNodeType
-type Emphasis struct{}
