@@ -70,7 +70,9 @@ func (table Table) String() string {
 
 /* end Table */
 
-type QuoteBlock struct{}
+type QuoteBlock struct{
+	Level int
+}
 
 func (quote QuoteBlock) String() string {
 	return "QuoteBlock"
@@ -101,7 +103,6 @@ func (text Math) String() string {
 }
 
 type Link struct {
-	name string
 	link string
 }
 

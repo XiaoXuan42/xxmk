@@ -107,8 +107,8 @@ __nice to meet you!__`
 	assert.Equal(t, 0, italicStrs["helloworld"])
 	assert.Equal(t, 0, italicStrs["hello world"])
 	assert.Equal(t, 0, italicStrs["world"])
-	assert.Equal(t, 1, codeStrs["```good `"])
-	assert.Equal(t, 1, codeStrs["`job``` `` job`"])
+	assert.Equal(t, 1, codeStrs["```good ` `job```"])
+	assert.Equal(t, 1, codeStrs["` job`"])
 	assert.Equal(t, 1, mathStrs["$hello$"])
 	assert.Equal(t, 0, mathStrs["$$world$"])
 	assert.Equal(t, 0, mathStrs["$world$$"])
@@ -156,31 +156,38 @@ int main() {
 }
 
 func TestLink(t *testing.T) {
-	mk := `[hello](hello.com), this is a good image ![image](image.com)`
+	mk := `[hello](hello.com), this is a good image ![image](image.com)
+[![image](imagePath)](imageLink)`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 
-	var linkType Link
-	var imageType Image
+	var linkType []Link
+	var linkNode []*AstNode
+	var imageType []Image
 	linkCnt, imageCnt := 0, 0
 	t.Logf("%s\n%s", mk, ast.String())
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Link:
-			linkType = tp
+			linkNode = append(linkNode, node)
+			linkType = append(linkType, tp)
 			linkCnt += 1
 		case Image:
-			imageType = tp
+			imageType = append(imageType, tp)
 			imageCnt += 1
 		default:
 		}
 	})
-	assert.Equal(t, 1, linkCnt)
-	assert.Equal(t, 1, imageCnt)
-	assert.Equal(t, "hello", linkType.name)
-	assert.Equal(t, "hello.com", linkType.link)
-	assert.Equal(t, "image", imageType.name)
-	assert.Equal(t, "image.com", imageType.link)
+	assert.Equal(t, 2, linkCnt)
+	assert.Equal(t, 2, imageCnt)
+	assert.Equal(t, "hello", linkNode[0].Children[0].Text(mk))
+	assert.Equal(t, "hello.com", linkType[0].link)
+	assert.Equal(t, "image", imageType[0].name)
+	assert.Equal(t, "image.com", imageType[0].link)
+	assert.Equal(t, "![image](imagePath)", linkNode[1].Children[0].Text(mk))
+	assert.Equal(t, "imageLink", linkType[1].link)
+	assert.Equal(t, "image", imageType[1].name)
+	assert.Equal(t, "imagePath", imageType[1].link)
 }
 
 func TestTable(t *testing.T) {
@@ -228,9 +235,9 @@ abc
 func TestQuoteBlock(t *testing.T) {
 	mk := `>    hello world
 
->    
+>>    
 >
->nice to meet you!`
+>>nice to meet you!`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
@@ -239,8 +246,10 @@ func TestQuoteBlock(t *testing.T) {
 	texts := []string{
 		"hello world", "", "", "nice to meet you!",
 	}
+	levels := []int{1, 2, 1, 2};
 	for i := 0; i < 4; i++ {
 		assert.Equal(t, "QuoteBlock", ast.root.Children[i].Type.String())
+		assert.Equal(t, levels[i], ast.root.Children[i].Type.(QuoteBlock).Level)
 		assert.Equal(t, 1, len(ast.root.Children[i].Children))
 		assert.Equal(t, "Text", ast.root.Children[i].Children[0].Type.String())
 		assert.Equal(t, texts[i], ast.root.Children[i].Children[0].Text(mk))

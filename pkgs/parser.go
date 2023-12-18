@@ -384,6 +384,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	if len(s) < 1 || s[0] != '>' {
 		return nil
 	}
+	blkType := QuoteBlock{}
 	node := &AstNode{
 		Type:        QuoteBlock{},
 		Start:       ctx.p,
@@ -394,7 +395,6 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	curCtx := ctx
 	curCtx.parent = node
 	curCtx.leftSibling = nil
-	curCtx.p.Consume('>')
 	end := strings.Index(s, "\n")
 	if end < 0 {
 		end = len(s)
@@ -402,7 +402,17 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	} else {
 		node.End.ConsumeStr(s[:end+1])
 	}
-	i := 1
+
+	i := 0
+	for i < len(s) {
+		if s[i] != '>' {
+			break
+		}
+		curCtx.p.Consume('>')
+		blkType.Level += 1
+		i += 1
+	}
+	node.Type = blkType
 	for i < len(s) {
 		if s[i] != ' ' {
 			break
@@ -510,33 +520,38 @@ func parseItalic(s string, ctx parseContext) *AstNode {
 }
 
 func parseCode(s string, ctx parseContext) *AstNode {
-	// multiple ` at the start/end will be the same as just one `
-	// multiple ` not at the start/end will be regarded as normal characters
 	if len(s) < 2 {
 		return nil
 	}
-	if s[0] != '`' {
-		return nil
-	}
 	curCtx := ctx
-	curCtx.p.Consume(rune('`'))
 	foundEnd := false
-	inSeq := true
+	inSeq := 0
+	leadingBackticks := 0
+	newS := s
 
-	newS := s[1:]
+	for len(newS) > 0 {
+		if newS[0] == '`' {
+			curCtx.p.Consume(rune('`'))
+			leadingBackticks += 1
+			newS = newS[1:]
+		} else {
+			break
+		}
+	}
+
+	fRightNotBacktick := func(i int) bool {
+		return i+1 >= len(newS) || !utf8.RuneStart(newS[i+1]) || newS[i+1] != '`'
+	}
 	for i, c := range newS {
 		curCtx.p.Consume(c)
 		if c == '`' {
-			if inSeq {
-				continue
-			}
-			if i+1 >= len(newS) || !utf8.RuneStart(newS[i+1]) || newS[i+1] != '`' {
+			inSeq += 1
+			if inSeq == leadingBackticks && fRightNotBacktick(i) {
 				foundEnd = true
 				break
 			}
-			inSeq = true
 		} else {
-			inSeq = false
+			inSeq = 0
 		}
 	}
 	if !foundEnd {
@@ -596,7 +611,23 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 	}
 	curPos := pos
 	newLineIdx := strings.Index(s, "\n")
-	rightIdx := strings.Index(s, "]")
+	rightIdx := -1
+	leftBracketMet := 0
+	for i, c := range s[1:] {
+		if newLineIdx >= 0 && i >= newLineIdx {
+			rightIdx = -1
+			break
+		}
+		if c == '[' {
+			leftBracketMet += 1
+		} else if c == ']' {
+			if leftBracketMet == 0 {
+				rightIdx = i + 1 // don't omit the [ at the beginning
+				break
+			}
+			leftBracketMet -= 1
+		}
+	}
 	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
 		return false, "", "", Pos{}
 	}
@@ -620,13 +651,24 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 func parseLink(s string, ctx parseContext) *AstNode {
 	ret, name, link, pos := _parseLinkLike(s, ctx.p)
 	if ret {
-		return &AstNode{
-			Type:        Link{name: name, link: link},
+		node := &AstNode{
+			Type:        Link{link: link},
 			Start:       ctx.p,
 			End:         pos,
 			Parent:      ctx.parent,
 			LeftSibling: ctx.leftSibling,
 		}
+		curCtx := ctx
+		curCtx.leftSibling = nil
+		curCtx.parent = node
+		curCtx.p.Consume('[')
+		log.Printf("parse Link: %s", name)
+		textnode := ctx.parseText(name, curCtx)
+		if textnode == nil {
+			log.Panicf("Failed to parse link %s", s)
+		}
+		node.Children = append(node.Children, textnode)
+		return node
 	} else {
 		return nil
 	}
