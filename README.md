@@ -33,11 +33,12 @@ Term
 ```
 x_1^2
 ```
+- Url/email address match may be wrong for links due to the wrong regexpr:
+
 
 ## Roadmap
 - [ ] Nested block by identation
 - [ ] List
-- [ ] Urls and Email Address links
 - [ ] Reference style links
 - [ ] Html tags
 - [ ] Footnotes
