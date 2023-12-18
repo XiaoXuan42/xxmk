@@ -224,3 +224,25 @@ abc
 	assert.Equal(t, "", line2.Children[1].Text(mk))
 	assert.Equal(t, "i", line2.Children[2].Text(mk))
 }
+
+func TestQuoteBlock(t *testing.T) {
+	mk := `>    hello world
+
+>    
+>
+>nice to meet you!`
+	parser := GetBaseMKParser()
+	ast := parser.Parse(mk)
+	t.Logf(ast.String())
+	assert.Equal(t, 4, len(ast.root.Children))
+
+	texts := []string{
+		"hello world", "", "", "nice to meet you!",
+	}
+	for i := 0; i < 4; i++ {
+		assert.Equal(t, "QuoteBlock", ast.root.Children[i].Type.String())
+		assert.Equal(t, 1, len(ast.root.Children[i].Children))
+		assert.Equal(t, "Text", ast.root.Children[i].Children[0].Type.String())
+		assert.Equal(t, texts[i], ast.root.Children[i].Children[0].Text(mk))
+	}
+}

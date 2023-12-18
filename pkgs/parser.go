@@ -380,6 +380,55 @@ func parseTable(s string, ctx parseContext) *AstNode {
 	return tableNode
 }
 
+func parseQuoteBlock(s string, ctx parseContext) *AstNode {
+	if len(s) < 1 || s[0] != '>' {
+		return nil
+	}
+	node := &AstNode{
+		Type: QuoteBlock{},
+		Start: ctx.p,
+		End: ctx.p,
+		Parent: ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	curCtx := ctx
+	curCtx.parent = node
+	curCtx.leftSibling = nil
+	curCtx.p.Consume('>')
+	end := strings.Index(s, "\n")
+	if end < 0 {
+		end = len(s)
+		node.End.ConsumeStr(s)
+	} else {
+		node.End.ConsumeStr(s[:end+1])
+	}
+	i := 1
+	for ; i < len(s) ; {
+		if s[i] != ' ' {
+			break
+		}
+		i += 1
+		curCtx.p.Consume(' ')
+	}
+	var textnode *AstNode
+	if i >= end {
+		textnode = &AstNode {
+			Type: Text{},
+			Start: curCtx.p,
+			End: curCtx.p,
+			Parent: curCtx.parent,
+			LeftSibling: curCtx.leftSibling,
+		}
+	} else {
+		textnode = ctx.parseText(s[i:end], curCtx)
+	}
+	if textnode == nil {
+		log.Panicf("Failed to parse quote: %s", s)
+	}
+	node.Children = append(node.Children, textnode)
+	return node
+}
+
 func parseStrong(s string, ctx parseContext) *AstNode {
 	if len(s) < 4 {
 		return nil
@@ -868,6 +917,7 @@ func (parser *MKParser) Parse(s string) Ast {
 func GetBaseMKParser() MKParser {
 	parser := MKParser{}
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
+	parser.BlockParserSeq = append(parser.BlockParserSeq, parseQuoteBlock)
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseCodeBlock)
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
 	parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)

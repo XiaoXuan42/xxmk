@@ -24,7 +24,7 @@ func (header Header) String() string {
 	return fmt.Sprintf("Header(%d)", header.Level)
 }
 
-type MathBlock struct {}
+type MathBlock struct{}
 
 func (math MathBlock) String() string {
 	return "MathBlock"
@@ -45,12 +45,12 @@ const (
 	AlignRight
 )
 
-type TableHead struct {}
+type TableHead struct{}
 type TableAlign struct {
 	aligns []int
 }
-type TableLine struct {}
-type Table struct {}
+type TableLine struct{}
+type Table struct{}
 
 func (head TableHead) String() string {
 	return "TableHead"
@@ -69,6 +69,12 @@ func (table Table) String() string {
 }
 
 /* end Table */
+
+type QuoteBlock struct{}
+
+func (quote QuoteBlock) String() string {
+	return "QuoteBlock"
+}
 
 type Strong struct{}
 
