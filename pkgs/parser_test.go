@@ -157,7 +157,7 @@ int main() {
 
 func TestLink(t *testing.T) {
 	mk := `[hello](hello.com), this is a good image ![image](image.com)
-[![image](imagePath)](imageLink)`
+[![image](imagePath)](imageLink) [images\[good](imagelink)`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 
@@ -178,7 +178,7 @@ func TestLink(t *testing.T) {
 		default:
 		}
 	})
-	assert.Equal(t, 2, linkCnt)
+	assert.Equal(t, 3, linkCnt)
 	assert.Equal(t, 2, imageCnt)
 	assert.Equal(t, "hello", linkNode[0].Children[0].Text(mk))
 	assert.Equal(t, "hello.com", linkType[0].link)
@@ -188,6 +188,7 @@ func TestLink(t *testing.T) {
 	assert.Equal(t, "imageLink", linkType[1].link)
 	assert.Equal(t, "image", imageType[1].name)
 	assert.Equal(t, "imagePath", imageType[1].link)
+	assert.Equal(t, `images\[good`, linkNode[2].Children[0].Text(mk))
 }
 
 func TestTable(t *testing.T) {
@@ -254,4 +255,46 @@ func TestQuoteBlock(t *testing.T) {
 		assert.Equal(t, "Text", ast.root.Children[i].Children[0].Type.String())
 		assert.Equal(t, texts[i], ast.root.Children[i].Children[0].Text(mk))
 	}
+}
+
+func TestHorizontalRule(t *testing.T) {
+	mk := `# good
+--
+---
+*
+***`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+	t.Logf(ast.String())
+	
+	hcnt := 0
+	hLines := []int{}
+	ast.root.PreVisit(func (node *AstNode) {
+		switch node.Type.(type) {
+		case HorizontalRule:
+			hcnt += 1
+			hLines = append(hLines, node.Start.Line)
+		}
+	})
+	assert.Equal(t, 2, hcnt)
+	assert.Equal(t, []int{2, 4}, hLines)
+}
+
+func TestStrikeThrough(t *testing.T) {
+	mk := `~~good job
+
+~~nice to meet you~
+~~nice to ~ ~ meet you!~~`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+	t.Logf(ast.String())
+	collects := []string{}
+	ast.root.PreVisit(func (node *AstNode) {
+		switch node.Type.(type) {
+		case StrikeThrough:
+			collects = append(collects, node.Children[0].Text(mk))
+		}
+	})
+	assert.Equal(t, 1, len(collects))
+	assert.Equal(t, "nice to ~ ~ meet you!", collects[0])
 }

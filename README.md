@@ -19,17 +19,25 @@ Header
 * item1
 + item2
 ```
-- Highlight: you can use `<mark> </mark>` instead.
+- Don't support highlight: you can use `<mark> </mark>` instead.
+```
+==highlight==
+```
+- Don't support definition list:
+```
+Term
+: definition1
+: definition2
+```
+- Don't support subscript/superscript. Put them in math block instead:
+```
+x_1^2
+```
 
 ## Roadmap
 - [ ] Nested block by identation
 - [ ] List
 - [ ] Reference style links
-- [ ] Horizontal rules
-- [ ] Strikethrough
 - [ ] Html tags
 - [ ] Footnotes
-- [ ] Heading ids
-- [ ] Definition list
 - [ ] Task lists
-- [ ] Subscript/Superscript

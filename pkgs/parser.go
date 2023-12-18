@@ -18,6 +18,7 @@ type parseContext struct {
 	parseText   func(string, parseContext) *AstNode
 }
 
+/* Block parsers */
 func parseHeader(s string, ctx parseContext) *AstNode {
 	if len(s) == 0 || s[0] != '#' {
 		return nil
@@ -439,6 +440,40 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	return node
 }
 
+func parseHorizontalRule(s string, ctx parseContext) *AstNode {
+	if len(s) < 3 {
+		return nil
+	}
+	symbol := rune(s[0])
+	symbolCnt := 0
+	pos := ctx.p
+	if symbol != '*' && symbol != '-' {
+		return nil
+	}
+	for _, c := range s {
+		pos.Consume(c)
+		if c == '\n' {
+			break
+		} else if c != symbol {
+			return nil
+		} else {
+			symbolCnt += 1
+		}
+	}
+	if symbolCnt < 3 {
+		return nil
+	}
+	node := &AstNode{
+		Type:        HorizontalRule{},
+		Start:       ctx.p,
+		End:         pos,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
+}
+
+/* Inline parsers */
 func parseEmphasis(s string, ctx parseContext) *AstNode {
 	if len(s) < 4 {
 		return nil
@@ -516,6 +551,53 @@ func parseItalic(s string, ctx parseContext) *AstNode {
 		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
+	return node
+}
+
+func parseStrikeThrough(s string, ctx parseContext) *AstNode {
+	if len(s) < 4 {
+		return nil
+	}
+	if s[:2] != "~~" {
+		return nil
+	}
+
+	lastHit := false
+	end := -1
+	for i, c := range s[2:] {
+		if c == '\n' {
+			return nil
+		} else if c == '~' {
+			if lastHit {
+				end = i + 2 // don't omit the ~~ at the beginning
+				break
+			}
+			lastHit = true
+		} else {
+			lastHit = false
+		}
+	}
+	if end < 0 {
+		return nil
+	}
+	endPos := ctx.p
+	endPos.ConsumeStr(s[:end+1])
+	node := &AstNode{
+		Type: StrikeThrough{},
+		Start: ctx.p,
+		End: endPos,
+		Parent: ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	curCtx := ctx
+	curCtx.p.ConsumeStr("~~")
+	curCtx.parent = node
+	curCtx.leftSibling = nil
+	textnode := ctx.parseText(s[2:end-1], curCtx)
+	if textnode == nil {
+		log.Panicf("Failed to parse text: %s", s[2:end-1])
+	}
+	node.Children = append(node.Children, textnode)
 	return node
 }
 
@@ -613,19 +695,26 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 	newLineIdx := strings.Index(s, "\n")
 	rightIdx := -1
 	leftBracketMet := 0
+	lastEscape := false
 	for i, c := range s[1:] {
 		if newLineIdx >= 0 && i >= newLineIdx {
 			rightIdx = -1
 			break
 		}
-		if c == '[' {
+		if !lastEscape && c == '[' {
 			leftBracketMet += 1
-		} else if c == ']' {
+		} 
+		if !lastEscape && c == ']' {
 			if leftBracketMet == 0 {
 				rightIdx = i + 1 // don't omit the [ at the beginning
 				break
 			}
 			leftBracketMet -= 1
+		}
+		if c == '\\' {
+			lastEscape = true
+		} else {
+			lastEscape = false
 		}
 	}
 	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
@@ -964,6 +1053,8 @@ func (parser *MKParser) addDefaultInlineParser(name string) {
 	case "Italic":
 		parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseItalic)
 		parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseItalic)
+	case "StrikeThrough":
+		parser.InlineParserSeq[rune('~')] = append(parser.InlineParserSeq[rune('~')], parseStrikeThrough)
 	case "Code":
 		parser.InlineParserSeq[rune('`')] = append(parser.InlineParserSeq[rune('`')], parseCode)
 	case "Math":
@@ -996,6 +1087,8 @@ func (parser *MKParser) addDefaultBlockParser(name string) {
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
 	case "Table":
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)
+	case "HorizontalRule":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseHorizontalRule)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1010,11 +1103,11 @@ func (parser *MKParser) addDefaultBlockParsers(names []string) {
 func GetHtmlMKParser() MKParser {
 	parser := MKParser{}
 	parser.addDefaultBlockParsers([]string{
-		"Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table",
+		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table",
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "Code", "Math", "Link", "Image",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "Image",
 	})
 	return parser
 }

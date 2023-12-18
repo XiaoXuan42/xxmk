@@ -8,8 +8,6 @@ func (doc Document) String() string {
 	return "Document"
 }
 
-// AstNodeType
-
 type Text struct{}
 
 func (text Text) String() string {
@@ -36,6 +34,12 @@ type CodeBlock struct {
 
 func (code CodeBlock) String() string {
 	return fmt.Sprintf("CodeBlock(%s)", code.Suffix)
+}
+
+type HorizontalRule struct {}
+
+func (rule HorizontalRule) String() string {
+	return "HorizontalRule"
 }
 
 /* Table */
@@ -88,6 +92,12 @@ type Italic struct{}
 
 func (text Italic) String() string {
 	return "Italic"
+}
+
+type StrikeThrough struct {}
+
+func (text StrikeThrough) String() string {
+	return "StrikeThrough"
 }
 
 type Code struct{}
