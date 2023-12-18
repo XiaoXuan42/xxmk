@@ -76,10 +76,10 @@ func (quote QuoteBlock) String() string {
 	return "QuoteBlock"
 }
 
-type Strong struct{}
+type Emphasis struct{}
 
-func (text Strong) String() string {
-	return "Strong"
+func (text Emphasis) String() string {
+	return "Emphasis"
 }
 
 type Italic struct{}

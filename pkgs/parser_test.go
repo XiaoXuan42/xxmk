@@ -14,7 +14,7 @@ this is a simple test
 sometexts...
 ## Section3
 sometexts...`
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(simplemk)
 	if ast.root.End.Line != 6 {
 		t.Fatalf("Wrong line count: %d(expect 6)", ast.root.End.Line)
@@ -66,7 +66,7 @@ __helloworld__
 __nice to meet you!__`
 	simplemk += "```good ` `job``` `` job`"
 	simplemk += "$hello$ $$world$ $world$$"
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(simplemk)
 	if ast.root.End.Line != 5 {
 		t.Fatalf("Wrong line count: %d", ast.root.End.Line)
@@ -78,7 +78,7 @@ __nice to meet you!__`
 	t.Logf("%s", ast.String())
 	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
-		case Strong:
+		case Emphasis:
 			t.Logf("Strong: %s", simplemk[node.Start.Offset:node.End.Offset])
 			strongStrs[simplemk[node.Start.Offset+2:node.End.Offset-2]] += 1
 		case Italic:
@@ -130,7 +130,7 @@ int main() {
 	simplemk := mathsnippt1
 	simplemk += "\n" + codesnippt
 	simplemk += "\n" + mathsnippt2
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(simplemk)
 	var mathContent, codeContent []string
 	var codeSuffix []string
@@ -157,7 +157,7 @@ int main() {
 
 func TestLink(t *testing.T) {
 	mk := `[hello](hello.com), this is a good image ![image](image.com)`
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 
 	var linkType Link
@@ -189,7 +189,7 @@ func TestTable(t *testing.T) {
 abc
 |d | e   | f|
 | g |  |  i`
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	assert.Equal(t, 1, len(ast.root.Children))
 	assert.Equal(t, "Table", ast.root.Children[0].Type.String())
@@ -231,7 +231,7 @@ func TestQuoteBlock(t *testing.T) {
 >    
 >
 >nice to meet you!`
-	parser := GetBaseMKParser()
+	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	assert.Equal(t, 4, len(ast.root.Children))

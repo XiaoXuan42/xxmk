@@ -204,7 +204,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 			result.hasOrMark = true
 			ctx.p.Consume('|')
 		}
-		for ; cur < len(s); {
+		for cur < len(s) {
 			curSep := strings.Index(s[cur:], "|")
 			var textStr string
 			nextP := ctx.p
@@ -385,10 +385,10 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type: QuoteBlock{},
-		Start: ctx.p,
-		End: ctx.p,
-		Parent: ctx.parent,
+		Type:        QuoteBlock{},
+		Start:       ctx.p,
+		End:         ctx.p,
+		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
 	curCtx := ctx
@@ -403,7 +403,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 		node.End.ConsumeStr(s[:end+1])
 	}
 	i := 1
-	for ; i < len(s) ; {
+	for i < len(s) {
 		if s[i] != ' ' {
 			break
 		}
@@ -412,11 +412,11 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	}
 	var textnode *AstNode
 	if i >= end {
-		textnode = &AstNode {
-			Type: Text{},
-			Start: curCtx.p,
-			End: curCtx.p,
-			Parent: curCtx.parent,
+		textnode = &AstNode{
+			Type:        Text{},
+			Start:       curCtx.p,
+			End:         curCtx.p,
+			Parent:      curCtx.parent,
 			LeftSibling: curCtx.leftSibling,
 		}
 	} else {
@@ -429,7 +429,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	return node
 }
 
-func parseStrong(s string, ctx parseContext) *AstNode {
+func parseEmphasis(s string, ctx parseContext) *AstNode {
 	if len(s) < 4 {
 		return nil
 	}
@@ -463,7 +463,7 @@ func parseStrong(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        Strong{},
+		Type:        Emphasis{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
@@ -914,23 +914,65 @@ func (parser *MKParser) Parse(s string) Ast {
 	return ast
 }
 
-func GetBaseMKParser() MKParser {
-	parser := MKParser{}
-	parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
-	parser.BlockParserSeq = append(parser.BlockParserSeq, parseQuoteBlock)
-	parser.BlockParserSeq = append(parser.BlockParserSeq, parseCodeBlock)
-	parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
-	parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)
+func (parser *MKParser) addDefaultInlineParser(name string) {
+	switch name {
+	case "Emphasis":
+		parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseEmphasis)
+		parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseEmphasis)
+	case "Italic":
+		parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseItalic)
+		parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseItalic)
+	case "Code":
+		parser.InlineParserSeq[rune('`')] = append(parser.InlineParserSeq[rune('`')], parseCode)
+	case "Math":
+		parser.InlineParserSeq[rune('$')] = append(parser.InlineParserSeq[rune('$')], parseMath)
+	case "Link":
+		parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseLink)
+	case "Image":
+		parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
+	default:
+		log.Panicf("%s is not supported", name)
+	}
+}
 
+func (parser *MKParser) addDefaultInlineParsers(names []string) {
+	// add in reverse order
+	for i := len(names) - 1; i >= 0; i-- {
+		parser.addDefaultInlineParser(names[i])
+	}
+}
+
+func (parser *MKParser) addDefaultBlockParser(name string) {
+	switch name {
+	case "Header":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseHeader)
+	case "QuoteBlock":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseQuoteBlock)
+	case "CodeBlock":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseCodeBlock)
+	case "MathBlock":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseMathBlock)
+	case "Table":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseTable)
+	default:
+		log.Panicf("%s is not supported", name)
+	}
+}
+
+func (parser *MKParser) addDefaultBlockParsers(names []string) {
+	for i := len(names) - 1; i >= 0; i-- {
+		parser.addDefaultBlockParser(names[i])
+	}
+}
+
+func GetHtmlMKParser() MKParser {
+	parser := MKParser{}
+	parser.addDefaultBlockParsers([]string{
+		"Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table",
+	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
-	// strong first, italic second
-	parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseItalic)
-	parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseItalic)
-	parser.InlineParserSeq[rune('*')] = append(parser.InlineParserSeq[rune('*')], parseStrong)
-	parser.InlineParserSeq[rune('_')] = append(parser.InlineParserSeq[rune('_')], parseStrong)
-	parser.InlineParserSeq[rune('`')] = append(parser.InlineParserSeq[rune('`')], parseCode)
-	parser.InlineParserSeq[rune('$')] = append(parser.InlineParserSeq[rune('$')], parseMath)
-	parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseLink)
-	parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
+	parser.addDefaultInlineParsers([]string{
+		"Emphasis", "Italic", "Code", "Math", "Link", "Image",
+	})
 	return parser
 }
