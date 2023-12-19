@@ -428,3 +428,37 @@ func TestReferenceLink(t *testing.T) {
 		assert.Equal(t, trueIndexMap[i][2], refLinkIndex[i].Title)
 	}
 }
+
+func TestFootNote(t *testing.T) {
+	mk := `hello [^1], this is me![^MyDescription]
+
+[^1]: world
+[^MyDescription]: David`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+
+	var footType []FootNote
+	var footIndexType []FootNoteIndex
+	var footIndexNode []*AstNode
+
+	ast.root.PreVisit(func (node *AstNode) {
+		switch tp := node.Type.(type) {
+		case FootNote:
+			footType = append(footType, tp)
+		case FootNoteIndex:
+			footIndexNode = append(footIndexNode, node)
+			footIndexType = append(footIndexType, tp)
+		}
+	})
+	trueMap := map[int][]string{
+		0: {"1", " world"},
+		1: {"MyDescription", " David"},
+	}
+	assert.Equal(t, 2, len(footType))
+	assert.Equal(t, 2, len(footIndexType))
+	for i := 0; i < 2; i++ {
+		assert.Equal(t, trueMap[i][0], footType[i].Index)
+		assert.Equal(t, trueMap[i][0], footIndexType[i].Index)
+		assert.Equal(t, trueMap[i][1], footIndexNode[i].Children[0].Text(mk))
+	}
+}

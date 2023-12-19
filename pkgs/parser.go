@@ -1065,7 +1065,7 @@ func parseReferenceLinkIndex(s string, ctx parseContext) *AstNode {
 		pos.ConsumeStr(s[:newLineIndex+1])
 	}
 
-	ok, link, title := _parseLinkTitle(s[rbr+2:newLineIndex])
+	ok, link, title := _parseLinkTitle(s[rbr+2 : newLineIndex])
 	if !ok {
 		return nil
 	}
@@ -1079,6 +1079,81 @@ func parseReferenceLinkIndex(s string, ctx parseContext) *AstNode {
 		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
 	}
+	return node
+}
+
+func parseFootNote(s string, ctx parseContext) *AstNode {
+	if len(s) <= 3 || s[0] != '[' || s[1] != '^' {
+		return nil
+	}
+	rbr := _findInLine(s, "]")
+	if rbr <= 2 {
+		return nil
+	}
+	index := s[2:rbr]
+	endPos := ctx.p
+	endPos.ConsumeStr(s[:rbr+1])
+	node := &AstNode{
+		Type:        FootNote{Index: index},
+		Start:       ctx.p,
+		End:         endPos,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
+}
+
+func parseFootNoteIndex(s string, ctx parseContext) *AstNode {
+	if len(s) <= 4 || s[0] != '[' || s[1] != '^' {
+		return nil
+	}
+	rbr := _findInLine(s, "]")
+	if rbr <= 2 {
+		return nil
+	}
+	endPos := ctx.p
+	index := s[2:rbr]
+
+	if rbr+1 >= len(s) || s[rbr+1] != ':' {
+		return nil
+	}
+
+	endLine := strings.Index(s, "\n")
+	if endLine < 0 {
+		endLine = len(s)
+		endPos.ConsumeStr(s)
+	} else {
+		endPos.ConsumeStr(s[:endLine+1])
+	}
+	node := &AstNode{
+		Type:        FootNoteIndex{Index: index},
+		Start:       ctx.p,
+		End:         endPos,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	textStart := ctx.p
+	textStart.ConsumeStr(s[:rbr+2])
+	curCtx := ctx
+	curCtx.p = textStart
+	curCtx.parent = node
+	curCtx.leftSibling = nil
+	var textnode *AstNode
+	if rbr+2 < endLine {
+		textnode = ctx.parseText(s[rbr+2:endLine], curCtx)
+		if textnode == nil {
+			log.Panicf("Failed to parse text %s", s[:endLine])
+		}
+	} else {
+		textnode = &AstNode{
+			Type:        Text{},
+			Start:       textStart,
+			End:         textStart,
+			Parent:      node,
+			LeftSibling: nil,
+		}
+	}
+	node.Children = append(node.Children, textnode)
 	return node
 }
 
@@ -1443,6 +1518,8 @@ func (parser *MKParser) addDefaultInlineParser(name string) {
 		parser.InlineParserSeq[rune('<')] = append(parser.InlineParserSeq[rune('<')], parseHtml)
 	case "ReferenceLink":
 		parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseReferenceLink)
+	case "FootNote":
+		parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseFootNote)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1473,6 +1550,8 @@ func (parser *MKParser) addDefaultBlockParser(name string) {
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseList)
 	case "ReferenceLinkIndex":
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseReferenceLinkIndex)
+	case "FootNoteIndex":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseFootNoteIndex)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1485,13 +1564,15 @@ func (parser *MKParser) addDefaultBlockParsers(names []string) {
 }
 
 func GetHtmlMKParser() MKParser {
+	// Emphasis before Italic
+	// FootNote before ReferenceLink
 	parser := MKParser{}
 	parser.addDefaultBlockParsers([]string{
-		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table", "List", "ReferenceLinkIndex",
+		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table", "List", "FootNoteIndex", "ReferenceLinkIndex",
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html", "ReferenceLink",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html",  "FootNote", "ReferenceLink",
 	})
 	return parser
 }

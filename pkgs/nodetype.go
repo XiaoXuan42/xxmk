@@ -163,12 +163,28 @@ func (link ReferenceLink) String() string {
 
 type ReferenceLinkIndex struct {
 	Index string
-	Link string
+	Link  string
 	Title string
 }
 
 func (link ReferenceLinkIndex) String() string {
 	return fmt.Sprintf("ReferenceLinkIndex(%s)", link.Index)
+}
+
+type FootNote struct {
+	Index string
+}
+
+func (footnote FootNote) String() string {
+	return fmt.Sprintf("FootNote(%s)", footnote.Index)
+}
+
+type FootNoteIndex struct {
+	Index string
+}
+
+func (footnote FootNoteIndex) String() string {
+	return fmt.Sprintf("FootNoteIndex(%s)", footnote.Index)
 }
 
 /* end link */
