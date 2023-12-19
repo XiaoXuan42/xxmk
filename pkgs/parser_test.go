@@ -156,7 +156,7 @@ int main() {
 }
 
 func TestLink(t *testing.T) {
-	mk := `[hello](hello.com), this is a good image ![image](image.com)
+	mk := `[hello](hello.com "hello link  "   ), this is a good image ![image](image.com)
 [![image](imagePath)](imageLink) [images\[good](imagelink) <https://www.baidu.com> <link class="hello"></link>
 <a><09@gmail.com>`
 	parser := GetHtmlMKParser()
@@ -165,6 +165,7 @@ func TestLink(t *testing.T) {
 	var linkType []Link
 	var linkNode []*AstNode
 	var imageType []Image
+	var imageNode []*AstNode
 	var simpleLinkType []SimpleLink
 	var simpleLinkNode []*AstNode
 	var htmlStartType []HtmlStartTag
@@ -176,6 +177,7 @@ func TestLink(t *testing.T) {
 			linkType = append(linkType, tp)
 		case Image:
 			imageType = append(imageType, tp)
+			imageNode = append(imageNode, node)
 		case SimpleLink:
 			simpleLinkType = append(simpleLinkType, tp)
 			simpleLinkNode = append(simpleLinkNode, node)
@@ -189,21 +191,22 @@ func TestLink(t *testing.T) {
 	assert.Equal(t, 2, len(simpleLinkType))
 	assert.Equal(t, 2, len(htmlStartType))
 	assert.Equal(t, "hello", linkNode[0].Children[0].Text(mk))
-	assert.Equal(t, "hello.com", linkType[0].link)
-	assert.Equal(t, "image", imageType[0].name)
-	assert.Equal(t, "image.com", imageType[0].link)
+	assert.Equal(t, "hello.com", linkType[0].Link)
+	assert.Equal(t, "hello link  ", linkType[0].Title)
+	assert.Equal(t, "image", imageNode[0].Children[0].Text(mk))
+	assert.Equal(t, "image.com", imageType[0].Link)
 	assert.Equal(t, "![image](imagePath)", linkNode[1].Children[0].Text(mk))
-	assert.Equal(t, "imageLink", linkType[1].link)
-	assert.Equal(t, "image", imageType[1].name)
-	assert.Equal(t, "imagePath", imageType[1].link)
+	assert.Equal(t, "imageLink", linkType[1].Link)
+	assert.Equal(t, "image", imageNode[1].Children[0].Text(mk))
+	assert.Equal(t, "imagePath", imageType[1].Link)
 	assert.Equal(t, `images\[good`, linkNode[2].Children[0].Text(mk))
-	assert.Equal(t, "https://www.baidu.com", simpleLinkType[0].link)
+	assert.Equal(t, "https://www.baidu.com", simpleLinkType[0].Link)
 	assert.Equal(t, "<https://www.baidu.com>", simpleLinkNode[0].Text(mk))
-	assert.Equal(t, "09@gmail.com", simpleLinkType[1].link)
+	assert.Equal(t, "09@gmail.com", simpleLinkType[1].Link)
 	assert.Equal(t, "<09@gmail.com>", simpleLinkNode[1].Text(mk))
-	assert.Equal(t, "link", htmlStartType[0].tag)
-	assert.Equal(t, "a", htmlStartType[1].tag)
-	assert.Equal(t, `class="hello"`, htmlStartType[0].content)
+	assert.Equal(t, "link", htmlStartType[0].Tag)
+	assert.Equal(t, "a", htmlStartType[1].Tag)
+	assert.Equal(t, `class="hello"`, htmlStartType[0].Content)
 }
 
 func TestTable(t *testing.T) {
@@ -262,7 +265,7 @@ func TestQuoteBlock(t *testing.T) {
 	texts := []string{
 		"hello world", "", "", "nice to meet you!",
 	}
-	levels := []int{1, 2, 1, 2};
+	levels := []int{1, 2, 1, 2}
 	for i := 0; i < 4; i++ {
 		assert.Equal(t, "QuoteBlock", ast.root.Children[i].Type.String())
 		assert.Equal(t, levels[i], ast.root.Children[i].Type.(QuoteBlock).Level)
@@ -281,10 +284,10 @@ func TestHorizontalRule(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	
+
 	hcnt := 0
 	hLines := []int{}
-	ast.root.PreVisit(func (node *AstNode) {
+	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
 		case HorizontalRule:
 			hcnt += 1
@@ -304,7 +307,7 @@ func TestStrikeThrough(t *testing.T) {
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	collects := []string{}
-	ast.root.PreVisit(func (node *AstNode) {
+	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
 		case StrikeThrough:
 			collects = append(collects, node.Children[0].Text(mk))
@@ -332,8 +335,8 @@ func TestList(t *testing.T) {
 	lst4 := ast.root.Children[3]
 	assert.Equal(t, false, lst1.Type.(List).IsOrdered)
 	assert.Equal(t, 3, len(lst1.Children))
-	itemNames := []string{ " item1", " item2", " item3" }
-	for i, ch := range(lst1.Children) {
+	itemNames := []string{" item1", " item2", " item3"}
+	for i, ch := range lst1.Children {
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
@@ -341,9 +344,9 @@ func TestList(t *testing.T) {
 
 	assert.Equal(t, true, lst2.Type.(List).IsOrdered)
 	assert.Equal(t, 1, len(lst2.Children))
-	itemNames = []string{ "    item4" }
-	orders := []int {1}
-	for i, ch := range(lst2.Children) {
+	itemNames = []string{"    item4"}
+	orders := []int{1}
+	for i, ch := range lst2.Children {
 		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
@@ -352,8 +355,8 @@ func TestList(t *testing.T) {
 
 	assert.Equal(t, false, lst3.Type.(List).IsOrdered)
 	assert.Equal(t, 1, len(lst3.Children))
-	itemNames = []string{ " item5" }
-	for i, ch := range(lst3.Children) {
+	itemNames = []string{" item5"}
+	for i, ch := range lst3.Children {
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
@@ -361,12 +364,67 @@ func TestList(t *testing.T) {
 
 	assert.Equal(t, true, lst4.Type.(List).IsOrdered)
 	assert.Equal(t, 2, len(lst4.Children))
-	itemNames = []string{ " item6", " item7" }
-	orders = []int {3, 4}
-	for i, ch := range(lst4.Children) {
+	itemNames = []string{" item6", " item7"}
+	orders = []int{3, 4}
+	for i, ch := range lst4.Children {
 		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
+	}
+}
+
+func TestParseLinkTitle(t *testing.T) {
+	inputs := []string{" https://somewhere.com", `http://nice.com "nice"  `}
+	trueMap := map[int][]string {
+		0: {"https://somewhere.com", ""},
+		1: {"http://nice.com", "nice"},
+	}
+	for i := 0; i < len(inputs); i++ {
+		ok, link, title := _parseLinkTitle(inputs[i])
+		assert.Equal(t, true, ok)
+		assert.Equal(t, trueMap[i][0], link)
+		assert.Equal(t, trueMap[i][1], title)
+	}
+}
+
+func TestReferenceLink(t *testing.T) {
+	mk := `reference link: [reflink ][1]
+[link][ link ]: reference link
+[ link ]: https://somewhere.com
+[1]: http://nice.com "nice"
+`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+
+	var refLink []ReferenceLink
+	var refNode []*AstNode
+	var refLinkIndex []ReferenceLinkIndex
+	ast.root.PreVisit(func (node *AstNode) {
+		switch tp := node.Type.(type) {
+		case ReferenceLink:
+			refLink = append(refLink, tp)
+			refNode = append(refNode, node)
+		case ReferenceLinkIndex:
+			refLinkIndex = append(refLinkIndex, tp)
+		}
+	})
+	t.Logf(ast.String())
+	assert.Equal(t, 2, len(refLink))
+	assert.Equal(t, 2, len(refLinkIndex))
+	trueRefMap := map[int][]string {
+		0: {"1", "reflink ", "https://somewhere.com", ""},
+		1: {" link ", "link", "http://nice.com", "nice"},
+	}
+	trueIndexMap := map[int][]string {
+		0: {" link ", "https://somewhere.com", ""},
+		1: {"1", "http://nice.com", "nice"},
+	}
+	for i := 0; i < 2; i++ {
+		assert.Equal(t, trueRefMap[i][0], refLink[i].Index)
+		assert.Equal(t, trueRefMap[i][1], refNode[i].Children[0].Text(mk))
+		assert.Equal(t, trueIndexMap[i][0], refLinkIndex[i].Index)
+		assert.Equal(t, trueIndexMap[i][1], refLinkIndex[i].Link)
+		assert.Equal(t, trueIndexMap[i][2], refLinkIndex[i].Title)
 	}
 }

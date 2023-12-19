@@ -522,7 +522,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 		if len(s) == 0 {
 			return nil
 		}
-		itemType := ListItem{ Order: 1 }
+		itemType := ListItem{Order: 1}
 		node := &AstNode{
 			Type:        ListItem{},
 			Start:       ctx.p,
@@ -559,8 +559,8 @@ func parseList(s string, ctx parseContext) *AstNode {
 				text = s[start:]
 				node.End.ConsumeStr(s[start:])
 			} else {
-				text = s[start:lineBrk+start]
-				node.End.ConsumeStr(s[start:lineBrk+start+1])
+				text = s[start : lineBrk+start]
+				node.End.ConsumeStr(s[start : lineBrk+start+1])
 			}
 		}
 		curCtx := ctx
@@ -844,9 +844,54 @@ func parseMath(s string, ctx parseContext) *AstNode {
 	return node
 }
 
-func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
+// url "title" | <url> "title", input should contain no '\n'
+func _parseLinkTitle(s string) (bool, string, string) {
+	var link, title string
+	linkStart, linkEnd := -1, -1
+	for i, c := range s {
+		if linkStart < 0 {
+			if c != ' ' {
+				linkStart = i
+			}
+		} else {
+			if c == ' ' {
+				break
+			}
+			linkEnd = i + 1 // to include the current character
+		}
+	}
+	if linkStart < 0 || linkEnd < 0 {
+		return false, "", ""
+	}
+	link = s[linkStart:linkEnd]
+	titleStart, titleEnd := -1, -1
+	for i, c := range s[linkEnd:] {
+		if titleStart < 0 {
+			if c == '"' {
+				titleStart = i + linkEnd + 1
+			} else if c != ' ' {
+				return false, "", ""
+			}
+		} else if titleEnd < 0 {
+			if c == '"' {
+				titleEnd = i + linkEnd
+			}
+		} else if c != ' ' {
+			return false, "", ""
+		}
+	}
+	if titleStart >= 0 && titleEnd <= 0 {
+		return false, "", ""
+	}
+	if titleStart >= 0 && titleEnd >= 0 {
+		title = s[titleStart:titleEnd]
+	}
+	return true, link, title
+}
+
+func _parseLinkLike(s string, pos Pos) (bool, string, string, string, Pos) {
 	if len(s) == 0 || s[0] != '[' {
-		return false, "", "", Pos{}
+		return false, "", "", "", Pos{}
 	}
 	curPos := pos
 	newLineIdx := strings.Index(s, "\n")
@@ -875,30 +920,37 @@ func _parseLinkLike(s string, pos Pos) (bool, string, string, Pos) {
 		}
 	}
 	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
-		return false, "", "", Pos{}
+		return false, "", "", "", Pos{}
 	}
 	name := s[1:rightIdx]
 	curPos.ConsumeStr(s[:rightIdx+1])
 
+	// focus on the (<url> "title"?) part
 	newS := s[rightIdx+1:]
 	if len(newS) < 2 || newS[0] != '(' {
-		return false, "", "", Pos{}
+		return false, "", "", "", Pos{}
 	}
 	newLineIdx = strings.Index(newS, "\n")
+
 	rightIdx = _findInLine(newS, ")")
 	if rightIdx < 0 || (newLineIdx >= 0 && newLineIdx < rightIdx) {
-		return false, "", "", Pos{}
+		return false, "", "", "", Pos{}
 	}
-	link := newS[1:rightIdx]
+
+	ok, link, title := _parseLinkTitle(newS[1:rightIdx])
+	if !ok {
+		return false, "", "", "", Pos{}
+	}
+
 	curPos.ConsumeStr(s[:rightIdx+1])
-	return true, name, link, curPos
+	return true, name, link, title, curPos
 }
 
 func parseLink(s string, ctx parseContext) *AstNode {
-	ret, name, link, pos := _parseLinkLike(s, ctx.p)
+	ret, name, link, title, pos := _parseLinkLike(s, ctx.p)
 	if ret {
 		node := &AstNode{
-			Type:        Link{link: link},
+			Type:        Link{Link: link, Title: title},
 			Start:       ctx.p,
 			End:         pos,
 			Parent:      ctx.parent,
@@ -933,7 +985,7 @@ func parseSimpleLink(s string, ctx parseContext) *AstNode {
 		endPos := ctx.p
 		endPos.ConsumeStr(s[:rightIdx+1])
 		node := &AstNode{
-			Type:        SimpleLink{link: link},
+			Type:        SimpleLink{Link: link},
 			Start:       ctx.p,
 			End:         endPos,
 			Parent:      ctx.parent,
@@ -945,21 +997,114 @@ func parseSimpleLink(s string, ctx parseContext) *AstNode {
 	}
 }
 
+func parseReferenceLink(s string, ctx parseContext) *AstNode {
+	lbr1, rbr1, lbr2, rbr2 := -1, -1, -1, -1
+	if len(s) <= 4 {
+		return nil
+	}
+	if s[0] != '[' {
+		return nil
+	}
+	lbr1 = 0
+	rbr1 = _findInLine(s[1:], "]") + 1
+	if rbr1 < 0 || rbr1+2 >= len(s) {
+		return nil
+	}
+	lbr2 = rbr1 + 1
+	if s[lbr2] == ' ' {
+		lbr2 += 1
+	}
+	if s[lbr2] != '[' {
+		return nil
+	}
+	rbr2 = _findInLine(s[lbr2:], "]") + lbr2
+	if rbr2 < 0 {
+		return nil
+	}
+	endPos := ctx.p
+	endPos.ConsumeStr(s[:rbr2+1])
+	node := &AstNode{
+		Type:        ReferenceLink{Index: s[lbr2+1 : rbr2]},
+		Start:       ctx.p,
+		End:         endPos,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	curCtx := ctx
+	curCtx.leftSibling = nil
+	curCtx.parent = node
+	curCtx.p.Consume('[')
+	text := s[lbr1+1 : rbr1]
+	if len(text) == 0 {
+		return nil
+	}
+	textnode := ctx.parseText(text, curCtx)
+	node.Children = append(node.Children, textnode)
+	return node
+}
+
+func parseReferenceLinkIndex(s string, ctx parseContext) *AstNode {
+	if len(s) <= 3 || s[0] != '[' {
+		return nil
+	}
+	lbr := 0
+	rbr := _findInLine(s, "]")
+	if rbr < 0 || rbr+1 >= len(s) || s[rbr+1] != ':' {
+		return nil
+	}
+	indexType := ReferenceLinkIndex{Index: s[lbr+1 : rbr]}
+	if rbr+2 >= len(s) {
+		return nil
+	}
+	pos := ctx.p
+	newLineIndex := strings.Index(s, "\n")
+	if newLineIndex < 0 {
+		pos.ConsumeStr(s)
+		newLineIndex = len(s)
+	} else {
+		pos.ConsumeStr(s[:newLineIndex+1])
+	}
+
+	ok, link, title := _parseLinkTitle(s[rbr+2:newLineIndex])
+	if !ok {
+		return nil
+	}
+	indexType.Link = link
+	indexType.Title = title
+
+	node := &AstNode{
+		Type:        indexType,
+		Start:       ctx.p,
+		End:         pos,
+		Parent:      ctx.parent,
+		LeftSibling: ctx.leftSibling,
+	}
+	return node
+}
+
 func parseImage(s string, ctx parseContext) *AstNode {
 	if len(s) < 1 && s[0] != '!' {
 		return nil
 	}
-	curPos := ctx.p
-	curPos.Consume(rune(s[0]))
-	ret, name, link, pos := _parseLinkLike(s[1:], ctx.p)
+	ret, name, link, title, pos := _parseLinkLike(s[1:], ctx.p)
 	if ret {
-		return &AstNode{
-			Type:        Image{name: name, link: link},
+		node := &AstNode{
+			Type:        Image{Link: link, Title: title},
 			Start:       ctx.p,
 			End:         pos,
 			Parent:      ctx.parent,
 			LeftSibling: ctx.leftSibling,
 		}
+		curCtx := ctx
+		curCtx.leftSibling = nil
+		curCtx.parent = node
+		curCtx.p.ConsumeStr("![")
+		textnode := ctx.parseText(name, curCtx)
+		if textnode == nil {
+			log.Panicf("Failed to parse link %s", s)
+		}
+		node.Children = append(node.Children, textnode)
+		return node
 	} else {
 		return nil
 	}
@@ -997,7 +1142,7 @@ func parseHtml(s string, ctx parseContext) *AstNode {
 	pos := ctx.p
 	pos.ConsumeStr(s[:tagEnd+1])
 	node := &AstNode{
-		Type:        HtmlStartTag{tag: tag, content: content},
+		Type:        HtmlStartTag{Tag: tag, Content: content},
 		Start:       ctx.p,
 		End:         pos,
 		Parent:      ctx.parent,
@@ -1007,7 +1152,7 @@ func parseHtml(s string, ctx parseContext) *AstNode {
 		if len(content) > 0 {
 			return nil
 		}
-		node.Type = HtmlEndTag{tag: tag}
+		node.Type = HtmlEndTag{Tag: tag}
 	}
 	return node
 }
@@ -1296,6 +1441,8 @@ func (parser *MKParser) addDefaultInlineParser(name string) {
 		parser.InlineParserSeq[rune('!')] = append(parser.InlineParserSeq[rune('!')], parseImage)
 	case "Html":
 		parser.InlineParserSeq[rune('<')] = append(parser.InlineParserSeq[rune('<')], parseHtml)
+	case "ReferenceLink":
+		parser.InlineParserSeq[rune('[')] = append(parser.InlineParserSeq[rune('[')], parseReferenceLink)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1324,6 +1471,8 @@ func (parser *MKParser) addDefaultBlockParser(name string) {
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseHorizontalRule)
 	case "List":
 		parser.BlockParserSeq = append(parser.BlockParserSeq, parseList)
+	case "ReferenceLinkIndex":
+		parser.BlockParserSeq = append(parser.BlockParserSeq, parseReferenceLinkIndex)
 	default:
 		log.Panicf("%s is not supported", name)
 	}
@@ -1338,11 +1487,11 @@ func (parser *MKParser) addDefaultBlockParsers(names []string) {
 func GetHtmlMKParser() MKParser {
 	parser := MKParser{}
 	parser.addDefaultBlockParsers([]string{
-		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table", "List",
+		"HorizontalRule", "Header", "QuoteBlock", "CodeBlock", "MathBlock", "Table", "List", "ReferenceLinkIndex",
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html", "ReferenceLink",
 	})
 	return parser
 }

@@ -136,7 +136,8 @@ func (text Math) String() string {
 /* Link */
 // [title](link)
 type Link struct {
-	link string
+	Link  string
+	Title string
 }
 
 func (link Link) String() string {
@@ -145,18 +146,36 @@ func (link Link) String() string {
 
 // <link> link is url or email address
 type SimpleLink struct {
-	link string
+	Link string
 }
 
 func (link SimpleLink) String() string {
 	return "SimpleLink"
 }
 
+type ReferenceLink struct {
+	Index string
+}
+
+func (link ReferenceLink) String() string {
+	return fmt.Sprintf("ReferenceLink(%s)", link.Index)
+}
+
+type ReferenceLinkIndex struct {
+	Index string
+	Link string
+	Title string
+}
+
+func (link ReferenceLinkIndex) String() string {
+	return fmt.Sprintf("ReferenceLinkIndex(%s)", link.Index)
+}
+
 /* end link */
 
 type Image struct {
-	name string
-	link string
+	Link  string
+	Title string
 }
 
 func (link Image) String() string {
@@ -164,18 +183,18 @@ func (link Image) String() string {
 }
 
 type HtmlStartTag struct {
-	tag     string
-	content string
+	Tag     string
+	Content string
 }
 
 func (html HtmlStartTag) String() string {
-	return fmt.Sprintf("HtmlStartTag(%s)", html.tag)
+	return fmt.Sprintf("HtmlStartTag(%s)", html.Tag)
 }
 
 type HtmlEndTag struct {
-	tag string
+	Tag string
 }
 
 func (html HtmlEndTag) String() string {
-	return fmt.Sprintf("HtmlEndTag(%s)", html.tag)
+	return fmt.Sprintf("HtmlEndTag(%s)", html.Tag)
 }
