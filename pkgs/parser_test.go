@@ -6,6 +6,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func _astCheck(node *AstNode) bool {
+	var lastCh *AstNode
+	for _, ch := range(node.Children) {
+		if ch.LeftSibling != lastCh {
+			return false
+		}
+		lastCh = ch
+		if !_astCheck(ch) {
+			return false
+		}
+	}
+	return true
+}
+
 func TestHeader(t *testing.T) {
 	simplemk := `# TestHeader
 this is a simple test
@@ -24,6 +38,7 @@ sometexts...`
 	textCount := 0
 	textTotalLen := 0
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Text:
@@ -77,6 +92,7 @@ __nice to meet you!__`
 	codeStrs := map[string]int{}
 	mathStrs := map[string]int{}
 	t.Logf("%s", ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
 		case Emphasis:
@@ -137,6 +153,7 @@ int main() {
 	var codeSuffix []string
 
 	t.Logf("%s\n%s", simplemk, ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case MathBlock:
@@ -171,6 +188,7 @@ func TestLink(t *testing.T) {
 	var simpleLinkNode []*AstNode
 	var htmlStartType []HtmlStartTag
 	t.Logf("%s\n%s", mk, ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Link:
@@ -218,6 +236,8 @@ abc
 | g |  |  i`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
+	t.Logf("%s", ast.String())
+	_astCheck(&ast.root)
 	assert.Equal(t, 1, len(ast.root.Children))
 	assert.Equal(t, "Table", ast.root.Children[0].Type.String())
 	assert.Equal(t, 5, len(ast.root.Children[0].Children))
@@ -261,6 +281,7 @@ func TestQuoteBlock(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	assert.Equal(t, 4, len(ast.root.Children))
 
 	texts := []string{
@@ -285,6 +306,7 @@ func TestHorizontalRule(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 
 	hcnt := 0
 	hLines := []int{}
@@ -307,6 +329,7 @@ func TestStrikeThrough(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	collects := []string{}
 	ast.root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
@@ -329,6 +352,7 @@ func TestList(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	assert.Equal(t, 4, len(ast.root.Children))
 	lst1 := ast.root.Children[0]
 	lst2 := ast.root.Children[1]
@@ -411,6 +435,7 @@ func TestReferenceLink(t *testing.T) {
 		}
 	})
 	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	assert.Equal(t, 2, len(refLink))
 	assert.Equal(t, 2, len(refLinkIndex))
 	trueRefMap := map[int][]string {
@@ -442,6 +467,8 @@ func TestFootNote(t *testing.T) {
 	var footIndexType []FootNoteIndex
 	var footIndexNode []*AstNode
 
+	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func (node *AstNode) {
 		switch tp := node.Type.(type) {
 		case FootNote:
@@ -474,6 +501,8 @@ func TestTaskList(t *testing.T) {
 	var listItemType []ListItem
 	var listItemNode []*AstNode
 	ast := parser.Parse(mk)
+	t.Logf(ast.String())
+	_astCheck(&ast.root)
 	ast.root.PreVisit(func (node *AstNode) {
 		switch tp := node.Type.(type) {
 		case ListItem:
