@@ -95,35 +95,24 @@ func parseHeader(s string, ctx parseContext) *AstNode {
 		ctx.p.Consume(rune(s[i]))
 		i = i + 1
 	}
-	if i < len(s) && s[i] != ' ' {
+	if i < len(s) && s[i] != ' ' && s[i] != '\n' {
 		return nil
 	}
-	for i < len(s) {
-		if s[i] != ' ' {
-			break
-		}
-		ctx.p.Consume(rune(s[i]))
-		i = i + 1
-	}
-	j := i
-	for j < len(s) {
-		if s[j] == '\n' {
-			j = j + 1
-			break
-		}
-		j = j + 1
-	}
-
-	textnode := ctx.parseText(s[i:j], ctx)
-	if textnode != nil {
-		node.Children = append(node.Children, textnode)
+	j := strings.Index(s, "\n")
+	var text string
+	endPos := ctx.p
+	if j < 0 {
+		text = s[i:]
+		endPos.ConsumeStr(s[i:])
 	} else {
-		log.Panicf("Failed to parse string. (start: %s)", ctx.p.String())
+		text = s[i:j]
+		endPos.ConsumeStr(s[i:j+1])
 	}
-	ctx.p.ConsumeStr(s[i:j])
+	textnode := _textOrEmpty(text, ctx)
+	node.Children = append(node.Children, textnode)
 
 	node.Type = head
-	node.End = ctx.p
+	node.End = endPos
 
 	return node
 }

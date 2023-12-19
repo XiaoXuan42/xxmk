@@ -23,6 +23,7 @@ sometexts...`
 	headerTot := 0
 	textCount := 0
 	textTotalLen := 0
+	t.Logf(ast.String())
 	ast.root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
 		case Text:
@@ -40,7 +41,7 @@ sometexts...`
 	if textCount != 6 {
 		t.Fatalf("Wrong text count: %d", textCount)
 	}
-	if textTotalLen != 88 {
+	if textTotalLen != 89 {
 		t.Fatalf("Wrong text total length: %d", textTotalLen)
 	}
 	if headerTot != 3 {
