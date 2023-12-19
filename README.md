@@ -40,5 +40,4 @@ x_1^2
 
 ## Roadmap
 - [ ] Nested block by identation
-- [ ] Task lists
 - [ ] Heading Ids(as extension)

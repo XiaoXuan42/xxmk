@@ -57,6 +57,24 @@ func _matchEmail(s string) bool {
 	return err == nil
 }
 
+func _textOrEmpty(text string, ctx parseContext) *AstNode {
+	if len(text) == 0 {
+		return &AstNode{
+			Type:        Text{},
+			Start:       ctx.p,
+			End:         ctx.p,
+			Parent:      ctx.parent,
+			LeftSibling: ctx.leftSibling,
+		}
+	} else {
+		textnode := ctx.parseText(text, ctx)
+		if textnode == nil {
+			log.Panicf("Failed to parse text: %s", text)
+		}
+		return textnode
+	}
+}
+
 /* Block parsers */
 func parseHeader(s string, ctx parseContext) *AstNode {
 	if len(s) == 0 || s[0] != '#' {
@@ -518,11 +536,10 @@ func parseList(s string, ctx parseContext) *AstNode {
 	}
 
 	fParseListLine := func(s string, ctx parseContext) *AstNode {
-		// return: ListItem astnode, isOrdered
 		if len(s) == 0 {
 			return nil
 		}
-		itemType := ListItem{Order: 1}
+		itemType := ListItem{}
 		node := &AstNode{
 			Type:        ListItem{},
 			Start:       ctx.p,
@@ -531,7 +548,14 @@ func parseList(s string, ctx parseContext) *AstNode {
 			LeftSibling: ctx.leftSibling,
 		}
 		start := 1
-		if s[0] != '-' {
+		taskPrefixLen := len("- [ ]")
+		if len(s) >= taskPrefixLen && s[:taskPrefixLen] == "- [ ]" {
+			itemType = ListItem{IsTask: true, IsFinished: false}
+			start = taskPrefixLen
+		} else if len(s) >= taskPrefixLen && s[:taskPrefixLen] == "- [x]" {
+			itemType = ListItem{IsTask: true, IsFinished: true}
+			start = taskPrefixLen
+		} else if s[0] != '-' {
 			dotPos := _findInLine(s, ".")
 			if dotPos <= 0 {
 				return nil
@@ -541,8 +565,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 				return nil
 			}
 			start = dotPos + 1
-			itemType.Order = order
-			itemType.IsOrdered = true
+			itemType = ListItem{IsOrdered: true, Order: order}
 		}
 		node.End.ConsumeStr(s[:start])
 		contentStart := node.End
@@ -567,18 +590,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 		curCtx.p = contentStart
 		curCtx.parent = node
 		curCtx.leftSibling = nil
-		var textnode *AstNode
-		if len(text) == 0 {
-			textnode = &AstNode{
-				Type:        Text{},
-				Start:       curCtx.p,
-				End:         curCtx.p,
-				Parent:      node,
-				LeftSibling: nil,
-			}
-		} else {
-			textnode = ctx.parseText(text, curCtx)
-		}
+		textnode := _textOrEmpty(text, curCtx)
 		node.Children = append(node.Children, textnode)
 		return node
 	}
@@ -601,6 +613,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 	}
 	curOrder := fstListItem.Type.(ListItem).Order + 1
 	listType.IsOrdered = fstListItem.Type.(ListItem).IsOrdered
+	listType.IsTask = fstListItem.Type.(ListItem).IsFinished
 	listnode.Type = listType
 	listnode.Children = append(listnode.Children, fstListItem)
 	curCtx.leftSibling = fstListItem
@@ -613,6 +626,8 @@ func parseList(s string, ctx parseContext) *AstNode {
 		if lstItem == nil {
 			break
 		} else if lstItem.Type.(ListItem).IsOrdered != listType.IsOrdered {
+			break
+		} else if lstItem.Type.(ListItem).IsTask != listType.IsTask {
 			break
 		} else {
 			lstItemType := lstItem.Type.(ListItem)
@@ -1572,7 +1587,7 @@ func GetHtmlMKParser() MKParser {
 	})
 	parser.InlineParserSeq = make(map[rune][]InlineParser)
 	parser.addDefaultInlineParsers([]string{
-		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html",  "FootNote", "ReferenceLink",
+		"Emphasis", "Italic", "StrikeThrough", "Code", "Math", "Link", "SimpleLink", "Image", "Html", "FootNote", "ReferenceLink",
 	})
 	return parser
 }

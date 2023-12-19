@@ -85,11 +85,14 @@ func (quote QuoteBlock) String() string {
 /* List */
 type List struct {
 	IsOrdered bool
+	IsTask bool
 }
 
 type ListItem struct {
 	IsOrdered bool
 	Order     int
+	IsTask    bool
+	IsFinished bool
 }
 
 func (list List) String() string {
@@ -97,7 +100,17 @@ func (list List) String() string {
 }
 
 func (item ListItem) String() string {
-	return fmt.Sprintf("ListItem(%d)", item.Order)
+	if item.IsTask {
+		s := "-"
+		if item.IsFinished {
+			s = "x"
+		}
+		return fmt.Sprintf("ListItem(task: %s)", s)
+	} else if item.IsOrdered {
+		return fmt.Sprintf("ListItem(%d)", item.Order)
+	} else {
+		return "ListItem"
+	}
 }
 
 /* end List */

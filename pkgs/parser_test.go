@@ -462,3 +462,41 @@ func TestFootNote(t *testing.T) {
 		assert.Equal(t, trueMap[i][1], footIndexNode[i].Children[0].Text(mk))
 	}
 }
+
+func TestTaskList(t *testing.T) {
+	mk := `- [] hello world!
+- [ ] good morning
+- [x] nice to meet you! 
+- [ ] how are you?`
+	parser := GetHtmlMKParser()
+	itemCnt := 0
+	var listItemType []ListItem
+	var listItemNode []*AstNode
+	ast := parser.Parse(mk)
+	ast.root.PreVisit(func (node *AstNode) {
+		switch tp := node.Type.(type) {
+		case ListItem:
+			itemCnt += 1
+			listItemType = append(listItemType, tp)
+			listItemNode = append(listItemNode, node)
+		}
+	})
+	assert.Equal(t, 4, itemCnt)
+	trueMap := map[int]string {
+		0: " [] hello world!",
+		1: " good morning",
+		2: " nice to meet you! ",
+		3: " how are you?",
+	}
+	finishMap := map[int][]bool {
+		0: { false, false },
+		1: { true, false },
+		2: { true, true },
+		3: { true, false},
+	}
+	for i := 1; i < 4; i++ {
+		assert.Equal(t, trueMap[i], listItemNode[i].Children[0].Text(mk))
+		assert.Equal(t, finishMap[i][0], listItemType[i].IsTask)
+		assert.Equal(t, finishMap[i][1], listItemType[i].IsFinished)
+	}
+}
