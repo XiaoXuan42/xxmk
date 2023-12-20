@@ -9,37 +9,37 @@ type MKParser struct {
 	InlineParserSeq map[rune][]InlineParser
 }
 
-func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
+func (parser *MKParser) parseText(s string, ctx ParseContext) *AstNode {
 	node := AstNode{
 		Type:        &Text{},
-		Start:       ctx.p,
-		Parent:      ctx.parent,
-		LeftSibling: ctx.leftSibling,
+		Start:       ctx.P,
+		Parent:      ctx.Parent,
+		LeftSibling: ctx.LeftSibling,
 	}
-	curCtx := parseContext{
-		p:           ctx.p,
-		parent:      &node,
-		leftSibling: nil,
-		parseText:   ctx.parseText,
+	curCtx := ParseContext{
+		P:           ctx.P,
+		Parent:      &node,
+		LeftSibling: nil,
+		ParseText:   ctx.ParseText,
 	}
 
 	textNodeAdded := false
-	textStartPos := curCtx.p
+	textStartPos := curCtx.P
 	fAddPrevTextNode := func() bool {
 		if textNodeAdded {
-			if curCtx.p.Offset == textStartPos.Offset {
+			if curCtx.P.Offset == textStartPos.Offset {
 				panic("Bug: should not add an empty text node")
 			}
-			if curCtx.leftSibling == nil || curCtx.leftSibling.Type.String() != "Text" {
+			if curCtx.LeftSibling == nil || curCtx.LeftSibling.Type.String() != "Text" {
 				panic("Bug: text node is not really added")
 			}
-			if curCtx.leftSibling.End != curCtx.p {
+			if curCtx.LeftSibling.End != curCtx.P {
 				panic("Bug: text node added is not complete")
 			}
-			node.Children = append(node.Children, curCtx.leftSibling)
+			node.Children = append(node.Children, curCtx.LeftSibling)
 			return true
 		} else {
-			if curCtx.p.Offset != textStartPos.Offset {
+			if curCtx.P.Offset != textStartPos.Offset {
 				panic("Bug: should add a new text node")
 			}
 			return false
@@ -53,11 +53,11 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 		if s[curIdx] != '\n' {
 			break
 		}
-		curCtx.p.Consume(rune(s[curIdx]))
+		curCtx.P.Consume(rune(s[curIdx]))
 		curIdx += 1
 	}
-	textStartPos = curCtx.p
-	node.Start = curCtx.p
+	textStartPos = curCtx.P
+	node.Start = curCtx.P
 	if curIdx == len(s) {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 				} else if parsers, ok := parser.InlineParserSeq[c]; ok {
 					// in reverse order
 					for i := len(parsers) - 1; i >= 0; i-- {
-						offset := curCtx.p.Offset - ctx.p.Offset
+						offset := curCtx.P.Offset - ctx.P.Offset
 						subnode = parsers[i](s[offset:], curCtx)
 						if subnode != nil {
 							break
@@ -93,45 +93,45 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 			}
 
 			if subnode != nil {
-				if subnode.End.Offset <= curCtx.p.Offset {
+				if subnode.End.Offset <= curCtx.P.Offset {
 					panic("Bug: subnode's offset should be larger")
 				}
 				fAddPrevTextNode()
-				curCtx.leftSibling = subnode
-				curCtx.p = subnode.End
-				textStartPos = curCtx.p
+				curCtx.LeftSibling = subnode
+				curCtx.P = subnode.End
+				textStartPos = curCtx.P
 				textNodeAdded = false
 				node.Children = append(node.Children, subnode)
 				break
 			} else {
-				curCtx.p.Consume(c)
+				curCtx.P.Consume(c)
 				if textNodeAdded {
-					curCtx.leftSibling.End = curCtx.p
+					curCtx.LeftSibling.End = curCtx.P
 				} else {
-					curCtx.leftSibling = &AstNode{
+					curCtx.LeftSibling = &AstNode{
 						Type:        &Text{},
 						Start:       textStartPos,
-						End:         curCtx.p,
-						Parent:      curCtx.parent,
-						LeftSibling: curCtx.leftSibling,
+						End:         curCtx.P,
+						Parent:      curCtx.Parent,
+						LeftSibling: curCtx.LeftSibling,
 					}
 					textNodeAdded = true
 				}
-				curCtx.leftSibling.End = curCtx.p
+				curCtx.LeftSibling.End = curCtx.P
 			}
 		}
 
 		fAddPrevTextNode()
-		textStartPos = curCtx.p
+		textStartPos = curCtx.P
 		textNodeAdded = false
 
-		curIdx = curCtx.p.Offset - ctx.p.Offset
+		curIdx = curCtx.P.Offset - ctx.P.Offset
 		if curIdx >= len(s) {
 			break
 		}
 	}
 
-	node.End = curCtx.p
+	node.End = curCtx.P
 	if len(node.Children) == 1 && node.Children[0].Type.String() == "Text" {
 		if node.Children[0].LeftSibling != nil {
 			panic("Bug: children's left sibling must be nil")
@@ -144,7 +144,7 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 		node.Children = nil
 	}
 
-	if !doubleEnter && node.End.Offset-ctx.p.Offset != len(s) {
+	if !doubleEnter && node.End.Offset-ctx.P.Offset != len(s) {
 		panic("Bug: Text should contain all characters of the string")
 	}
 	return &node
@@ -157,50 +157,50 @@ func (parser *MKParser) Parse(s string) Ast {
 			Start: Pos{Line: 0, Col: 0, Offset: 0},
 		},
 	}
-	ctx := parseContext{
-		p:           Pos{Line: 0, Col: 0, Offset: 0},
-		parent:      &ast.Root,
-		leftSibling: nil,
-		parseText:   parser.parseText,
+	ctx := ParseContext{
+		P:           Pos{Line: 0, Col: 0, Offset: 0},
+		Parent:      &ast.Root,
+		LeftSibling: nil,
+		ParseText:   parser.parseText,
 	}
 
-	textStartPos := ctx.p
+	textStartPos := ctx.P
 	textNodeAdded := false
 	fAddTextNode := func() {
 		if textNodeAdded {
-			if textStartPos == ctx.p {
+			if textStartPos == ctx.P {
 				panic("Bug: should not add an empty text node")
 			}
-			if ctx.leftSibling == nil || ctx.leftSibling.Type.String() != "Text" {
+			if ctx.LeftSibling == nil || ctx.LeftSibling.Type.String() != "Text" {
 				panic("Bug: text node is not really added")
 			}
-			if ctx.leftSibling.End != ctx.p {
+			if ctx.LeftSibling.End != ctx.P {
 				panic("Bug: text node added is not complete")
 			}
 
 			// provide correct context for parsing text node
-			endPoint := ctx.p
-			ctx.leftSibling = ctx.leftSibling.LeftSibling
-			ctx.p = textStartPos
+			endPoint := ctx.P
+			ctx.LeftSibling = ctx.LeftSibling.LeftSibling
+			ctx.P = textStartPos
 
-			for ctx.p != endPoint {
-				if ctx.p.Offset > endPoint.Offset {
+			for ctx.P != endPoint {
+				if ctx.P.Offset > endPoint.Offset {
 					panic("Bug: ctx's offset should not exceed endPoint's")
 				}
-				textnode := ctx.parseText(s[ctx.p.Offset:endPoint.Offset], ctx)
+				textnode := ctx.ParseText(s[ctx.P.Offset:endPoint.Offset], ctx)
 				if textnode == nil {
 					// trailing '\n'
-					ctx.p = endPoint
+					ctx.P = endPoint
 					break
 				}
 				ast.Root.Children = append(ast.Root.Children, textnode)
-				ctx.leftSibling = textnode
-				ctx.p = textnode.End
+				ctx.LeftSibling = textnode
+				ctx.P = textnode.End
 			}
-			textStartPos = ctx.p
+			textStartPos = ctx.P
 			textNodeAdded = false
 		} else {
-			if textStartPos != ctx.p {
+			if textStartPos != ctx.P {
 				panic("Bug: should add a new text node")
 			}
 		}
@@ -208,43 +208,43 @@ func (parser *MKParser) Parse(s string) Ast {
 
 	isNewLine := true
 	for {
-		for _, c := range s[ctx.p.Offset:] {
+		for _, c := range s[ctx.P.Offset:] {
 			var subnode *AstNode
 			for j := len(parser.BlockParserSeq) - 1; isNewLine && (j >= 0); j-- {
 				blkParser := parser.BlockParserSeq[j]
-				if subnode = blkParser(s[ctx.p.Offset:], ctx); subnode != nil {
+				if subnode = blkParser(s[ctx.P.Offset:], ctx); subnode != nil {
 					break
 				}
 			}
 
 			if subnode != nil {
 				fAddTextNode()
-				if subnode.End.Offset <= ctx.p.Offset {
+				if subnode.End.Offset <= ctx.P.Offset {
 					panic("Bug: subnode's offset should be larger")
 				}
 				ast.Root.LeftSibling = subnode
 				ast.Root.Children = append(ast.Root.Children, subnode)
-				ctx.leftSibling = subnode
-				ctx.p = subnode.End
-				textStartPos = ctx.p
+				ctx.LeftSibling = subnode
+				ctx.P = subnode.End
+				textStartPos = ctx.P
 				break
 			} else {
 				if textNodeAdded {
-					ctx.p.Consume(c)
-					if ctx.leftSibling.Type.String() != "Text" {
+					ctx.P.Consume(c)
+					if ctx.LeftSibling.Type.String() != "Text" {
 						panic("Bug: should add a 'Text' node")
 					}
-					ctx.leftSibling.End = ctx.p
+					ctx.LeftSibling.End = ctx.P
 				} else {
 					// create phony text node to "simulate" the context
-					textStartPos = ctx.p
-					ctx.p.Consume(c)
-					ctx.leftSibling = &AstNode{
+					textStartPos = ctx.P
+					ctx.P.Consume(c)
+					ctx.LeftSibling = &AstNode{
 						Type:        &Text{},
 						Start:       textStartPos,
-						End:         ctx.p,
-						Parent:      ctx.parent,
-						LeftSibling: ctx.leftSibling,
+						End:         ctx.P,
+						Parent:      ctx.Parent,
+						LeftSibling: ctx.LeftSibling,
 					}
 					textNodeAdded = true
 				}
@@ -252,19 +252,19 @@ func (parser *MKParser) Parse(s string) Ast {
 			}
 		}
 		fAddTextNode()
-		if ctx.p.Offset >= len(s) {
+		if ctx.P.Offset >= len(s) {
 			break
 		}
-		if ctx.p.Col != 0 {
+		if ctx.P.Col != 0 {
 			panic("Bug: should parse to a new line here")
 		}
 		isNewLine = true
 	}
 
-	if ctx.p.Offset < len(s) {
+	if ctx.P.Offset < len(s) {
 		panic("Bug: parser should read all characters")
 	}
-	ast.Root.End = ctx.p
+	ast.Root.End = ctx.P
 
 	return ast
 }

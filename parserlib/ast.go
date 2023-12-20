@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-
 type Pos struct {
 	Line   int
 	Col    int
@@ -41,20 +40,6 @@ func (pos *Pos) Back(c rune) {
 	if pos.Col < 0 || pos.Offset < 0 {
 		panic("Invalid position")
 	}
-}
-
-func (pos *Pos) _toProtobuf() *PosProto {
-	res := &PosProto{}
-	res.Line = int32(pos.Line)
-	res.Col = int32(pos.Col)
-	res.Offset = int32(pos.Offset)
-	return res
-}
-
-func (pos *Pos) _fromProtobuf(buf *PosProto) {
-	pos.Line = int(buf.Line)
-	pos.Col = int(buf.Col)
-	pos.Offset = int(buf.Offset)
 }
 
 type AstNode struct {
@@ -119,46 +104,6 @@ func (astnode *AstNode) Text(s string) string {
 	return s[astnode.Start.Offset:astnode.End.Offset]
 }
 
-func (astnode *AstNode) _toProtobuf(ar *[]*AstNodeProto) int32 {
-	nodeProto := &AstNodeProto{}
-	curId := int32(len(*ar))
-	*ar = append(*ar, nodeProto)
-
-	nodeProto.Type = &AstNodeTypeProto{}
-	nodeProto.Type = _astNodeTypeToProtobuf(astnode.Type)
-	nodeProto.Start = astnode.Start._toProtobuf()
-	nodeProto.End = astnode.End._toProtobuf()
-
-	for _, ch := range astnode.Children {
-		chId := ch._toProtobuf(ar)
-		nodeProto.Children = append(nodeProto.Children, chId)
-	}
-	leftsib := int32(-1)
-	for _, chId := range nodeProto.Children {
-		(*ar)[chId].Parent = curId
-		(*ar)[chId].Leftsibling = leftsib
-		leftsib = chId
-	}
-	return int32(curId)
-}
-
-func (astnode *AstNode) _fromProtobuf(ar []*AstNodeProto, curId int32) {
-	curBuf := ar[curId]
-	astnode.Type = _astNodeTypeFromProtobuf(curBuf.Type)
-	astnode.Start._fromProtobuf(curBuf.Start)
-	astnode.End._fromProtobuf(curBuf.End)
-
-	var leftSib *AstNode
-	for _, chId := range curBuf.Children {
-		chNode := &AstNode{}
-		chNode._fromProtobuf(ar, chId)
-		chNode.Parent = astnode
-		chNode.LeftSibling = leftSib
-		leftSib = chNode
-		astnode.Children = append(astnode.Children, chNode)
-	}
-}
-
 func (astnode *AstNode) _eq(other *AstNode) bool {
 	if !reflect.DeepEqual(astnode.Type, other.Type) {
 		return false
@@ -183,19 +128,6 @@ func (ast *Ast) String() string {
 		return "None"
 	}
 	return ast.Root.String()
-}
-
-func (ast *Ast) ToProtoBuf() *AstProto {
-	buf := &AstProto{}
-	ast.Root._toProtobuf(&buf.Nodes)
-	return buf
-}
-
-func (ast *Ast) FromProtobuf(astProto *AstProto) {
-	if astProto == nil {
-		return
-	}
-	ast.Root._fromProtobuf(astProto.Nodes, 0)
 }
 
 func (ast *Ast) Eq(other *Ast) bool {

@@ -1,7 +1,7 @@
 syntax = "proto3";
 package parser;
 
-option go_package = "/parserlib";
+option go_package = "/xxmkproto";
 
 enum AstNodeTypeEnumProto {
     Document = 0;

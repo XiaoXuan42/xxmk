@@ -2,38 +2,10 @@ package parserlib
 
 import (
 	"fmt"
-	"reflect"
-
-	"github.com/XiaoXuan42/xxmk/naivesel"
 )
 
 type AstNodeType interface {
 	String() string
-}
-
-
-func _setWhich(s string, buf *AstNodeTypeProto) {
-	buf.Which = AstNodeTypeEnumProto(AstNodeTypeEnumProto_value[s])
-}
-
-func _getAstNodeType(buf *AstNodeTypeProto) AstNodeType {
-	str := AstNodeTypeEnumProto_name[int32(buf.Which)]
-	intf := reflect.New(reflect.TypeOf(str2NodeType[str]).Elem()).Interface()
-	return intf.(AstNodeType)
-}
-
-func _astNodeTypeToProtobuf(tp AstNodeType) *AstNodeTypeProto {
-	typeProto := &AstNodeTypeProto{}
-	tpName := reflect.TypeOf(tp).Elem().Name()
-	_setWhich(tpName, typeProto)
-	typeProto.Encode = append(typeProto.Encode, naivesel.Serialize(tp)...)
-	return typeProto
-}
-
-func _astNodeTypeFromProtobuf(buf *AstNodeTypeProto) AstNodeType {
-	nodeTp := _getAstNodeType(buf)
-	naivesel.Deserialize(nodeTp, buf.Encode)
-	return nodeTp
 }
 
 type Document struct{}
@@ -262,7 +234,7 @@ func (html HtmlEndTag) String() string {
 	return fmt.Sprintf("HtmlEndTag(%s)", html.Tag)
 }
 
-var str2NodeType = map[string]AstNodeType{
+var Str2NodeType = map[string]AstNodeType{
 	"Document":           &Document{},
 	"Text":               &Text{},
 	"Header":             &Header{},

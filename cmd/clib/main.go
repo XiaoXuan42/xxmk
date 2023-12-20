@@ -11,6 +11,7 @@ typedef struct ByteSlice {
 import "C"
 import (
 	"github.com/XiaoXuan42/xxmk/parserlib"
+	"github.com/XiaoXuan42/xxmk/xxmkproto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,7 +26,7 @@ func ParseMarkDownToAstString(markdown string) *C.char {
 func ParseMarkDownToAstProto(markdown string) C.struct_ByteSlice {
 	p := parserlib.GetFullMKParser()
 	ast := p.Parse(markdown)
-	astProto := ast.ToProtoBuf()
+	astProto := xxmkproto.AstToProtoBuf(&ast)
 	buf, err := proto.Marshal(astProto)
 	var slice C.struct_ByteSlice
 	if err != nil {
