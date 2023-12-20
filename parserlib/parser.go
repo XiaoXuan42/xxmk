@@ -381,11 +381,11 @@ func parseTable(s string, ctx parseContext) *AstNode {
 				isRight = true
 			}
 			if isLeft && isRight {
-				alignType.aligns = append(alignType.aligns, AlignMiddle)
+				alignType.Aligns = append(alignType.Aligns, AlignMiddle)
 			} else if isRight {
-				alignType.aligns = append(alignType.aligns, AlignRight)
+				alignType.Aligns = append(alignType.Aligns, AlignRight)
 			} else {
-				alignType.aligns = append(alignType.aligns, AlignLeft)
+				alignType.Aligns = append(alignType.Aligns, AlignLeft)
 			}
 		}
 	}
@@ -1293,12 +1293,14 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 	if curIdx == len(s) {
 		return nil
 	}
-	for {
+	doubleEnter := false
+	for !doubleEnter {
 		lastEscape, lastEnter := false, false
 		for _, c := range s[curIdx:] {
 			var subnode *AstNode
 			if c == '\n' {
 				if lastEnter {
+					doubleEnter = true
 					break
 				}
 				lastEscape = false
@@ -1374,7 +1376,7 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 		node.Children = nil
 	}
 
-	if node.End.Offset-ctx.p.Offset != len(s) {
+	if !doubleEnter && node.End.Offset-ctx.p.Offset != len(s) {
 		panic("Bug: Text should contain all characters of the string")
 	}
 	return &node

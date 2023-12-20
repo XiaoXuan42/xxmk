@@ -1,6 +1,7 @@
 package parserlib
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,17 +15,17 @@ func TestPbMarshal(t *testing.T) {
 }
 
 func TestPbEncDec(t *testing.T) {
-	hd := Header{ Level: 2 }
+	hd := Header{Level: 2}
 	hdBuf := _astNodeTypeToProtobuf(&hd)
 	hdBack := _astNodeTypeFromProtobuf(hdBuf)
 	assert.Equal(t, hdBack, &hd)
 
-	refLink := ReferenceLinkIndex{ Title: "link", Link: "http" }
+	refLink := ReferenceLinkIndex{Title: "link", Link: "http"}
 	refBuf := _astNodeTypeToProtobuf(&refLink)
 	refBack := _astNodeTypeFromProtobuf(refBuf)
 	assert.Equal(t, refBack, &refLink)
 
-	align := TableAlign{ aligns: []uint32{0, 1, 2, 3, 4} }
+	align := TableAlign{Aligns: []uint32{0, 1, 2, 3, 4}}
 	alignBuf := _astNodeTypeToProtobuf(&align)
 	alignBack := _astNodeTypeFromProtobuf(alignBuf)
 	assert.Equal(t, alignBack, &align)
@@ -34,4 +35,12 @@ func TestPbEncDec(t *testing.T) {
 		backV := _astNodeTypeFromProtobuf(tpProto)
 		assert.Equal(t, v, backV)
 	}
+}
+
+func TestGetValList(t *testing.T) {
+	refLink := ReferenceLinkIndex{Title: "link", Link: "http"}
+	v1 := _getValList(&refLink)
+	v2 := refLink.GetValueList()
+	assert.Equal(t, 3, len(v1))
+	assert.Equal(t, true, reflect.DeepEqual(v1, v2))
 }

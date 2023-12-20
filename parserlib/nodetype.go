@@ -11,6 +11,16 @@ type AstNodeType interface {
 	GetValueList() []interface{}
 }
 
+func _getValList(tp interface{}) []interface{} {
+	var result []interface{}
+	val := reflect.ValueOf(tp).Elem()
+	for i := 0; i < val.NumField(); i++ {
+		addr := val.Field(i).Addr().Interface()
+		result = append(result, addr)
+	}
+	return result
+}
+
 func _encodeUint32(vs ...uint32) []byte {
 	b := make([]byte, 4*len(vs))
 	for i, v := range vs {
@@ -149,7 +159,8 @@ func _astNodeTypeToProtobuf(tp AstNodeType) *AstNodeTypeProto {
 	typeProto := &AstNodeTypeProto{}
 	tpName := reflect.TypeOf(tp).Elem().Name()
 	_setWhich(tpName, typeProto)
-	valList := tp.GetValueList()
+	valList := _getValList(tp)
+	// valList := tp.GetValueList()
 	typeProto.Encode = append(typeProto.Encode, _valueListToBytes(valList)...)
 	return typeProto
 }
@@ -240,7 +251,7 @@ const (
 
 type TableHead struct{}
 type TableAlign struct {
-	aligns []uint32
+	Aligns []uint32
 }
 type TableLine struct{}
 type Table struct{}
@@ -258,7 +269,7 @@ func (align TableAlign) String() string {
 }
 
 func (align *TableAlign) GetValueList() []interface{} {
-	return []interface{}{&align.aligns}
+	return []interface{}{&align.Aligns}
 }
 
 func (line TableLine) String() string {

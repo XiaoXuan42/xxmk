@@ -23,7 +23,7 @@ func _astCheck(node *AstNode) bool {
 func TestSucc(t *testing.T) {
 	parser := GetHtmlMKParser()
 	mks := []string{
-`# Title1
+		`# Title1
 - item1
 - item2
 
@@ -31,8 +31,8 @@ hello world!
 ## Title2
 1. item1
 2. item2
-`,}
-	for _, mk := range(mks) {
+`}
+	for _, mk := range mks {
 		parser.Parse(mk)
 	}
 }
@@ -269,10 +269,10 @@ abc
 
 	assert.Equal(t, "TableAlign", alignNode.Type.String())
 	tbAlign := alignNode.Type.(*TableAlign)
-	assert.Equal(t, 3, len(tbAlign.aligns))
-	assert.Equal(t, AlignMiddle, tbAlign.aligns[0])
-	assert.Equal(t, AlignRight, tbAlign.aligns[1])
-	assert.Equal(t, AlignLeft, tbAlign.aligns[2])
+	assert.Equal(t, 3, len(tbAlign.Aligns))
+	assert.Equal(t, AlignMiddle, tbAlign.Aligns[0])
+	assert.Equal(t, AlignRight, tbAlign.Aligns[1])
+	assert.Equal(t, AlignLeft, tbAlign.Aligns[2])
 
 	line0 := lineNodes[0]
 	assert.Equal(t, 1, len(line0.Children))
@@ -546,4 +546,22 @@ func TestTaskList(t *testing.T) {
 		assert.Equal(t, finishMap[i][0], listItemType[i].IsTask)
 		assert.Equal(t, finishMap[i][1], listItemType[i].IsFinished)
 	}
+}
+
+func TestSimpleAST(t *testing.T) {
+	mk := `Part1
+
+Part2`
+	parser := GetHtmlMKParser()
+	ast := parser.Parse(mk)
+	s := ast.String()
+	t.Logf("%s", s)
+	textCnt := 0
+	ast.Root.PreVisit(func (node *AstNode) {
+		switch node.Type.(type) {
+		case *Text:
+			textCnt += 1
+		}
+	})
+	assert.Equal(t, 2, textCnt)
 }
