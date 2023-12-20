@@ -556,6 +556,7 @@ Part2`
 	ast := parser.Parse(mk)
 	s := ast.String()
 	t.Logf("%s", s)
+	_astCheck(&ast.Root)
 	textCnt := 0
 	ast.Root.PreVisit(func (node *AstNode) {
 		switch node.Type.(type) {

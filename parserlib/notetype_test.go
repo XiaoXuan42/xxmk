@@ -1,7 +1,6 @@
 package parserlib
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,12 +34,4 @@ func TestPbEncDec(t *testing.T) {
 		backV := _astNodeTypeFromProtobuf(tpProto)
 		assert.Equal(t, v, backV)
 	}
-}
-
-func TestGetValList(t *testing.T) {
-	refLink := ReferenceLinkIndex{Title: "link", Link: "http"}
-	v1 := _getValList(&refLink)
-	v2 := refLink.GetValueList()
-	assert.Equal(t, 3, len(v1))
-	assert.Equal(t, true, reflect.DeepEqual(v1, v2))
 }
