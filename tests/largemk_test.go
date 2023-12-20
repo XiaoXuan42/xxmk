@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/XiaoXuan42/xxmk/parserlib"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDontPanic(t *testing.T) {
@@ -13,6 +13,6 @@ func TestDontPanic(t *testing.T) {
 	assert.Equal(t, nil, err)
 	s := string(res)
 
-	parser := parserlib.GetHtmlMKParser()
+	parser := parserlib.GetFullMKParser()
 	parser.Parse(s)
 }

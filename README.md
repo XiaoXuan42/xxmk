@@ -41,4 +41,3 @@ x_1^2
 ## Roadmap
 - [ ] Nested block by identation
 - [ ] Heading Ids(as extension)
-- [ ] Convert to html

@@ -10,21 +10,20 @@ typedef struct ByteSlice {
 */
 import "C"
 import (
-
 	"github.com/XiaoXuan42/xxmk/parserlib"
 	"google.golang.org/protobuf/proto"
 )
 
 //export ParseMarkDownToAstString
 func ParseMarkDownToAstString(markdown string) *C.char {
-	p := parserlib.GetHtmlMKParser()
+	p := parserlib.GetFullMKParser()
 	ast := p.Parse(markdown)
 	return C.CString(ast.String())
 }
 
 //export ParseMarkDownToAstProto
 func ParseMarkDownToAstProto(markdown string) C.struct_ByteSlice {
-	p := parserlib.GetHtmlMKParser()
+	p := parserlib.GetFullMKParser()
 	ast := p.Parse(markdown)
 	astProto := ast.ToProtoBuf()
 	buf, err := proto.Marshal(astProto)

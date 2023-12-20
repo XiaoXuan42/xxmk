@@ -21,7 +21,7 @@ func _astCheck(node *AstNode) bool {
 }
 
 func TestSucc(t *testing.T) {
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	mks := []string{
 		`# Title1
 - item1
@@ -45,7 +45,7 @@ this is a simple test
 sometexts...
 ## Section3
 sometexts...`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(simplemk)
 	if ast.Root.End.Line != 6 {
 		t.Fatalf("Wrong line count: %d(expect 6)", ast.Root.End.Line)
@@ -99,7 +99,7 @@ __helloworld__
 __nice to meet you!__`
 	simplemk += "```good ` `job``` `` job`"
 	simplemk += "$hello$ $$world$ $world$$"
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(simplemk)
 	if ast.Root.End.Line != 5 {
 		t.Fatalf("Wrong line count: %d", ast.Root.End.Line)
@@ -164,7 +164,7 @@ int main() {
 	simplemk := mathsnippt1
 	simplemk += "\n" + codesnippt
 	simplemk += "\n" + mathsnippt2
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(simplemk)
 	var mathContent, codeContent []string
 	var codeSuffix []string
@@ -194,7 +194,7 @@ func TestLink(t *testing.T) {
 	mk := `[hello](hello.com "hello link  "   ), this is a good image ![image](image.com)
 [![image](imagePath)](imageLink) [images\[good](imagelink) <https://www.baidu.com> <link class="hello"></link>
 <a><09@gmail.com>`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 
 	var linkType []Link
@@ -251,7 +251,7 @@ func TestTable(t *testing.T) {
 abc
 |d | e   | f|
 | g |  |  i`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	t.Logf("%s", ast.String())
 	_astCheck(&ast.Root)
@@ -295,7 +295,7 @@ func TestQuoteBlock(t *testing.T) {
 >>    
 >
 >>nice to meet you!`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	_astCheck(&ast.Root)
@@ -320,7 +320,7 @@ func TestHorizontalRule(t *testing.T) {
 ---
 *
 ***`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	_astCheck(&ast.Root)
@@ -343,7 +343,7 @@ func TestStrikeThrough(t *testing.T) {
 
 ~~nice to meet you~
 ~~nice to ~ ~ meet you!~~`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	_astCheck(&ast.Root)
@@ -366,7 +366,7 @@ func TestList(t *testing.T) {
 - item5
 3. item6
 6. item7`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
 	_astCheck(&ast.Root)
@@ -436,7 +436,7 @@ func TestReferenceLink(t *testing.T) {
 [ link ]: https://somewhere.com
 [1]: http://nice.com "nice"
 `
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 
 	var refLink []ReferenceLink
@@ -477,7 +477,7 @@ func TestFootNote(t *testing.T) {
 
 [^1]: world
 [^MyDescription]: David`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 
 	var footType []FootNote
@@ -513,7 +513,7 @@ func TestTaskList(t *testing.T) {
 - [ ] good morning
 - [x] nice to meet you! 
 - [ ] how are you?`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	itemCnt := 0
 	var listItemType []ListItem
 	var listItemNode []*AstNode
@@ -552,13 +552,13 @@ func TestSimpleAST(t *testing.T) {
 	mk := `Part1
 
 Part2`
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	s := ast.String()
 	t.Logf("%s", s)
 	_astCheck(&ast.Root)
 	textCnt := 0
-	ast.Root.PreVisit(func (node *AstNode) {
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
 		case *Text:
 			textCnt += 1

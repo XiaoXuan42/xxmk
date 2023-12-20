@@ -33,7 +33,7 @@ hello world!
 1. item1
 2. item2
 `
-	parser := GetHtmlMKParser()
+	parser := GetFullMKParser()
 	ast := parser.Parse(mk)
 	astProto := ast.ToProtoBuf()
 	buf, err := proto.Marshal(astProto)
