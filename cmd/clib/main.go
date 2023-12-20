@@ -1,7 +1,7 @@
 package main
 
 import "C"
-import "github.com/XiaoXuan42/xxmk/parser"
+import "github.com/XiaoXuan42/xxmk/parserlib"
 
 
 //export ParseMarkDownToAstString
