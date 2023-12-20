@@ -1,0 +1,58 @@
+syntax = "proto3";
+package parser;
+
+option go_package = "/parser";
+
+enum AstNodeTypeEnumProto {
+    Document = 0;
+    Text = 1;
+    Header = 2;
+    MathBlock = 3;
+    CodeBlock = 4;
+    HorizontalRule = 5;
+    TableHead = 6;
+    TableAlign = 7;
+    TableLine = 8;
+    Table = 9;
+    QuoteBlock = 10;
+    List = 11;
+    ListItem = 12;
+    Emphasis = 13;
+    Italic = 14;
+    StrikeThrough = 15;
+    Code = 16;
+    Math = 17;
+    Link = 18;
+    SimpleLink = 19;
+    ReferenceLink = 20;
+    ReferenceLinkIndex = 21;
+    FootNote = 22;
+    FootNoteIndex = 23;
+    Image = 24;
+    HtmlStartTag = 25;
+    HtmlEndTag = 26;
+}
+
+message AstNodeTypeProto {
+    AstNodeTypeEnumProto which = 1;
+    bytes encode = 2;
+}
+
+message PosProto {
+    int32 line = 1;
+    int32 col = 2;
+    int32 offset = 3;
+}
+
+message AstNodeProto {
+    AstNodeTypeProto type = 1;
+    PosProto start = 2;
+    PosProto end = 3;
+    int32 parent = 4;
+    int32 leftsibling = 5;
+    repeated int32 children = 6;
+}
+
+message AstProto {
+    repeated AstNodeProto nodes = 1;
+}

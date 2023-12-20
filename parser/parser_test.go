@@ -1,4 +1,4 @@
-package xxmk
+package parser
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 
 func _astCheck(node *AstNode) bool {
 	var lastCh *AstNode
-	for _, ch := range(node.Children) {
+	for _, ch := range node.Children {
 		if ch.LeftSibling != lastCh {
 			return false
 		}
@@ -18,6 +18,23 @@ func _astCheck(node *AstNode) bool {
 		}
 	}
 	return true
+}
+
+func TestSucc(t *testing.T) {
+	parser := GetHtmlMKParser()
+	mks := []string{
+`# Title1
+- item1
+- item2
+
+hello world!
+## Title2
+1. item1
+2. item2
+`,}
+	for _, mk := range(mks) {
+		parser.Parse(mk)
+	}
 }
 
 func TestHeader(t *testing.T) {
@@ -30,24 +47,24 @@ sometexts...
 sometexts...`
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(simplemk)
-	if ast.root.End.Line != 6 {
-		t.Fatalf("Wrong line count: %d(expect 6)", ast.root.End.Line)
+	if ast.Root.End.Line != 6 {
+		t.Fatalf("Wrong line count: %d(expect 6)", ast.Root.End.Line)
 	}
-	headerCount := map[int]int{}
+	headerCount := map[uint32]int{}
 	headerTot := 0
 	textCount := 0
 	textTotalLen := 0
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func(node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case Text:
+		case *Text:
 			textTotalLen += node.End.Offset - node.Start.Offset
 			textCount += 1
-		case Header:
+		case *Header:
 			headerCount[tp.Level] += 1
 			headerTot += 1
-		case Document:
+		case *Document:
 		default:
 			t.Fatalf("Wrong node type: %s", node.Type.String())
 		}
@@ -84,29 +101,29 @@ __nice to meet you!__`
 	simplemk += "$hello$ $$world$ $world$$"
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(simplemk)
-	if ast.root.End.Line != 5 {
-		t.Fatalf("Wrong line count: %d", ast.root.End.Line)
+	if ast.Root.End.Line != 5 {
+		t.Fatalf("Wrong line count: %d", ast.Root.End.Line)
 	}
 	strongStrs := map[string]int{}
 	italicStrs := map[string]int{}
 	codeStrs := map[string]int{}
 	mathStrs := map[string]int{}
 	t.Logf("%s", ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func(node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
-		case Emphasis:
+		case *Emphasis:
 			t.Logf("Strong: %s", simplemk[node.Start.Offset:node.End.Offset])
 			strongStrs[simplemk[node.Start.Offset+2:node.End.Offset-2]] += 1
-		case Italic:
+		case *Italic:
 			t.Logf("Italic: %s", simplemk[node.Start.Offset:node.End.Offset])
 			italicStrs[simplemk[node.Start.Offset+1:node.End.Offset-1]] += 1
-		case Text:
+		case *Text:
 			t.Logf("Text: %s", simplemk[node.Start.Offset:node.End.Offset])
-		case Code:
+		case *Code:
 			t.Logf("Code: %s", simplemk[node.Start.Offset:node.End.Offset])
 			codeStrs[simplemk[node.Start.Offset:node.End.Offset]] += 1
-		case Math:
+		case *Math:
 			t.Logf("Math: %s", simplemk[node.Start.Offset:node.End.Offset])
 			mathStrs[simplemk[node.Start.Offset:node.End.Offset]] += 1
 		default:
@@ -153,12 +170,12 @@ int main() {
 	var codeSuffix []string
 
 	t.Logf("%s\n%s", simplemk, ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func(node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case MathBlock:
+		case *MathBlock:
 			mathContent = append(mathContent, simplemk[node.Start.Offset:node.End.Offset])
-		case CodeBlock:
+		case *CodeBlock:
 			codeSuffix = append(codeSuffix, tp.Suffix)
 			codeContent = append(codeContent, simplemk[node.Start.Offset:node.End.Offset])
 		default:
@@ -188,20 +205,20 @@ func TestLink(t *testing.T) {
 	var simpleLinkNode []*AstNode
 	var htmlStartType []HtmlStartTag
 	t.Logf("%s\n%s", mk, ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func(node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case Link:
+		case *Link:
 			linkNode = append(linkNode, node)
-			linkType = append(linkType, tp)
-		case Image:
-			imageType = append(imageType, tp)
+			linkType = append(linkType, *tp)
+		case *Image:
+			imageType = append(imageType, *tp)
 			imageNode = append(imageNode, node)
-		case SimpleLink:
-			simpleLinkType = append(simpleLinkType, tp)
+		case *SimpleLink:
+			simpleLinkType = append(simpleLinkType, *tp)
 			simpleLinkNode = append(simpleLinkNode, node)
-		case HtmlStartTag:
-			htmlStartType = append(htmlStartType, tp)
+		case *HtmlStartTag:
+			htmlStartType = append(htmlStartType, *tp)
 		default:
 		}
 	})
@@ -237,13 +254,13 @@ abc
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf("%s", ast.String())
-	_astCheck(&ast.root)
-	assert.Equal(t, 1, len(ast.root.Children))
-	assert.Equal(t, "Table", ast.root.Children[0].Type.String())
-	assert.Equal(t, 5, len(ast.root.Children[0].Children))
-	headerNode := ast.root.Children[0].Children[0]
-	alignNode := ast.root.Children[0].Children[1]
-	lineNodes := ast.root.Children[0].Children[2:]
+	_astCheck(&ast.Root)
+	assert.Equal(t, 1, len(ast.Root.Children))
+	assert.Equal(t, "Table", ast.Root.Children[0].Type.String())
+	assert.Equal(t, 5, len(ast.Root.Children[0].Children))
+	headerNode := ast.Root.Children[0].Children[0]
+	alignNode := ast.Root.Children[0].Children[1]
+	lineNodes := ast.Root.Children[0].Children[2:]
 	assert.Equal(t, "TableHead", headerNode.Type.String())
 	assert.Equal(t, 3, len(headerNode.Children))
 	assert.Equal(t, "hello", headerNode.Children[0].Text(mk))
@@ -251,7 +268,7 @@ abc
 	assert.Equal(t, "", headerNode.Children[2].Text(mk))
 
 	assert.Equal(t, "TableAlign", alignNode.Type.String())
-	tbAlign := alignNode.Type.(TableAlign)
+	tbAlign := alignNode.Type.(*TableAlign)
 	assert.Equal(t, 3, len(tbAlign.aligns))
 	assert.Equal(t, AlignMiddle, tbAlign.aligns[0])
 	assert.Equal(t, AlignRight, tbAlign.aligns[1])
@@ -281,19 +298,19 @@ func TestQuoteBlock(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
-	assert.Equal(t, 4, len(ast.root.Children))
+	_astCheck(&ast.Root)
+	assert.Equal(t, 4, len(ast.Root.Children))
 
 	texts := []string{
 		"hello world", "", "", "nice to meet you!",
 	}
-	levels := []int{1, 2, 1, 2}
+	levels := []uint32{1, 2, 1, 2}
 	for i := 0; i < 4; i++ {
-		assert.Equal(t, "QuoteBlock", ast.root.Children[i].Type.String())
-		assert.Equal(t, levels[i], ast.root.Children[i].Type.(QuoteBlock).Level)
-		assert.Equal(t, 1, len(ast.root.Children[i].Children))
-		assert.Equal(t, "Text", ast.root.Children[i].Children[0].Type.String())
-		assert.Equal(t, texts[i], ast.root.Children[i].Children[0].Text(mk))
+		assert.Equal(t, "QuoteBlock", ast.Root.Children[i].Type.String())
+		assert.Equal(t, levels[i], ast.Root.Children[i].Type.(*QuoteBlock).Level)
+		assert.Equal(t, 1, len(ast.Root.Children[i].Children))
+		assert.Equal(t, "Text", ast.Root.Children[i].Children[0].Type.String())
+		assert.Equal(t, texts[i], ast.Root.Children[i].Children[0].Text(mk))
 	}
 }
 
@@ -306,13 +323,13 @@ func TestHorizontalRule(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
+	_astCheck(&ast.Root)
 
 	hcnt := 0
 	hLines := []int{}
-	ast.root.PreVisit(func(node *AstNode) {
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
-		case HorizontalRule:
+		case *HorizontalRule:
 			hcnt += 1
 			hLines = append(hLines, node.Start.Line)
 		}
@@ -329,11 +346,11 @@ func TestStrikeThrough(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
+	_astCheck(&ast.Root)
 	collects := []string{}
-	ast.root.PreVisit(func(node *AstNode) {
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch node.Type.(type) {
-		case StrikeThrough:
+		case *StrikeThrough:
 			collects = append(collects, node.Children[0].Text(mk))
 		}
 	})
@@ -352,13 +369,13 @@ func TestList(t *testing.T) {
 	parser := GetHtmlMKParser()
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
-	assert.Equal(t, 4, len(ast.root.Children))
-	lst1 := ast.root.Children[0]
-	lst2 := ast.root.Children[1]
-	lst3 := ast.root.Children[2]
-	lst4 := ast.root.Children[3]
-	assert.Equal(t, false, lst1.Type.(List).IsOrdered)
+	_astCheck(&ast.Root)
+	assert.Equal(t, 4, len(ast.Root.Children))
+	lst1 := ast.Root.Children[0]
+	lst2 := ast.Root.Children[1]
+	lst3 := ast.Root.Children[2]
+	lst4 := ast.Root.Children[3]
+	assert.Equal(t, false, lst1.Type.(*List).IsOrdered)
 	assert.Equal(t, 3, len(lst1.Children))
 	itemNames := []string{" item1", " item2", " item3"}
 	for i, ch := range lst1.Children {
@@ -367,18 +384,18 @@ func TestList(t *testing.T) {
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
 	}
 
-	assert.Equal(t, true, lst2.Type.(List).IsOrdered)
+	assert.Equal(t, true, lst2.Type.(*List).IsOrdered)
 	assert.Equal(t, 1, len(lst2.Children))
 	itemNames = []string{"    item4"}
-	orders := []int{1}
+	orders := []uint32{1}
 	for i, ch := range lst2.Children {
-		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
+		assert.Equal(t, orders[i], ch.Type.(*ListItem).Order)
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
 	}
 
-	assert.Equal(t, false, lst3.Type.(List).IsOrdered)
+	assert.Equal(t, false, lst3.Type.(*List).IsOrdered)
 	assert.Equal(t, 1, len(lst3.Children))
 	itemNames = []string{" item5"}
 	for i, ch := range lst3.Children {
@@ -387,12 +404,12 @@ func TestList(t *testing.T) {
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
 	}
 
-	assert.Equal(t, true, lst4.Type.(List).IsOrdered)
+	assert.Equal(t, true, lst4.Type.(*List).IsOrdered)
 	assert.Equal(t, 2, len(lst4.Children))
 	itemNames = []string{" item6", " item7"}
-	orders = []int{3, 4}
+	orders = []uint32{3, 4}
 	for i, ch := range lst4.Children {
-		assert.Equal(t, orders[i], ch.Type.(ListItem).Order)
+		assert.Equal(t, orders[i], ch.Type.(*ListItem).Order)
 		assert.Equal(t, 1, len(ch.Children))
 		assert.Equal(t, "Text", ch.Children[0].Type.String())
 		assert.Equal(t, itemNames[i], ch.Children[0].Text(mk))
@@ -401,7 +418,7 @@ func TestList(t *testing.T) {
 
 func TestParseLinkTitle(t *testing.T) {
 	inputs := []string{" https://somewhere.com", `http://nice.com "nice"  `}
-	trueMap := map[int][]string {
+	trueMap := map[int][]string{
 		0: {"https://somewhere.com", ""},
 		1: {"http://nice.com", "nice"},
 	}
@@ -425,24 +442,24 @@ func TestReferenceLink(t *testing.T) {
 	var refLink []ReferenceLink
 	var refNode []*AstNode
 	var refLinkIndex []ReferenceLinkIndex
-	ast.root.PreVisit(func (node *AstNode) {
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case ReferenceLink:
-			refLink = append(refLink, tp)
+		case *ReferenceLink:
+			refLink = append(refLink, *tp)
 			refNode = append(refNode, node)
-		case ReferenceLinkIndex:
-			refLinkIndex = append(refLinkIndex, tp)
+		case *ReferenceLinkIndex:
+			refLinkIndex = append(refLinkIndex, *tp)
 		}
 	})
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
+	_astCheck(&ast.Root)
 	assert.Equal(t, 2, len(refLink))
 	assert.Equal(t, 2, len(refLinkIndex))
-	trueRefMap := map[int][]string {
+	trueRefMap := map[int][]string{
 		0: {"1", "reflink ", "https://somewhere.com", ""},
 		1: {" link ", "link", "http://nice.com", "nice"},
 	}
-	trueIndexMap := map[int][]string {
+	trueIndexMap := map[int][]string{
 		0: {" link ", "https://somewhere.com", ""},
 		1: {"1", "http://nice.com", "nice"},
 	}
@@ -468,14 +485,14 @@ func TestFootNote(t *testing.T) {
 	var footIndexNode []*AstNode
 
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func (node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case FootNote:
-			footType = append(footType, tp)
-		case FootNoteIndex:
+		case *FootNote:
+			footType = append(footType, *tp)
+		case *FootNoteIndex:
 			footIndexNode = append(footIndexNode, node)
-			footIndexType = append(footIndexType, tp)
+			footIndexType = append(footIndexType, *tp)
 		}
 	})
 	trueMap := map[int][]string{
@@ -502,27 +519,27 @@ func TestTaskList(t *testing.T) {
 	var listItemNode []*AstNode
 	ast := parser.Parse(mk)
 	t.Logf(ast.String())
-	_astCheck(&ast.root)
-	ast.root.PreVisit(func (node *AstNode) {
+	_astCheck(&ast.Root)
+	ast.Root.PreVisit(func(node *AstNode) {
 		switch tp := node.Type.(type) {
-		case ListItem:
+		case *ListItem:
 			itemCnt += 1
-			listItemType = append(listItemType, tp)
+			listItemType = append(listItemType, *tp)
 			listItemNode = append(listItemNode, node)
 		}
 	})
 	assert.Equal(t, 4, itemCnt)
-	trueMap := map[int]string {
+	trueMap := map[int]string{
 		0: " [] hello world!",
 		1: " good morning",
 		2: " nice to meet you! ",
 		3: " how are you?",
 	}
-	finishMap := map[int][]bool {
-		0: { false, false },
-		1: { true, false },
-		2: { true, true },
-		3: { true, false},
+	finishMap := map[int][]bool{
+		0: {false, false},
+		1: {true, false},
+		2: {true, true},
+		3: {true, false},
 	}
 	for i := 1; i < 4; i++ {
 		assert.Equal(t, trueMap[i], listItemNode[i].Children[0].Text(mk))

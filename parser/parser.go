@@ -1,4 +1,4 @@
-package xxmk
+package parser
 
 import (
 	"log"
@@ -60,7 +60,7 @@ func _matchEmail(s string) bool {
 func _textOrEmpty(text string, ctx parseContext) *AstNode {
 	if len(text) == 0 {
 		return &AstNode{
-			Type:        Text{},
+			Type:        &Text{},
 			Start:       ctx.p,
 			End:         ctx.p,
 			Parent:      ctx.parent,
@@ -106,12 +106,12 @@ func parseHeader(s string, ctx parseContext) *AstNode {
 		endPos.ConsumeStr(s[i:])
 	} else {
 		text = s[i:j]
-		endPos.ConsumeStr(s[i:j+1])
+		endPos.ConsumeStr(s[i : j+1])
 	}
 	textnode := _textOrEmpty(text, ctx)
 	node.Children = append(node.Children, textnode)
 
-	node.Type = head
+	node.Type = &head
 	node.End = endPos
 
 	return node
@@ -188,7 +188,7 @@ func parseMathBlock(s string, ctx parseContext) *AstNode {
 	ret, start, end, _ := _parseWithPrefix(s, "$$", true, ctx.p)
 	if ret {
 		node := &AstNode{
-			Type:        MathBlock{},
+			Type:        &MathBlock{},
 			Start:       start,
 			End:         end,
 			Parent:      ctx.parent,
@@ -204,7 +204,7 @@ func parseCodeBlock(s string, ctx parseContext) *AstNode {
 	ret, start, end, suffix := _parseWithPrefix(s, "```", true, ctx.p)
 	if ret {
 		node := &AstNode{
-			Type:        CodeBlock{Suffix: suffix},
+			Type:        &CodeBlock{Suffix: suffix},
 			Start:       start,
 			End:         end,
 			Parent:      ctx.parent,
@@ -281,7 +281,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 			var curText *AstNode
 			if tailingSpace < leadingSpace {
 				curText = &AstNode{
-					Type:        Text{},
+					Type:        &Text{},
 					Start:       ctx.p,
 					End:         ctx.p,
 					Parent:      ctx.parent,
@@ -313,7 +313,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 	}
 
 	tableNode := &AstNode{
-		Type:        Table{},
+		Type:        &Table{},
 		Start:       ctx.p,
 		End:         ctx.p,
 		Parent:      ctx.parent,
@@ -325,7 +325,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 	curRear := 0
 
 	headerNode := &AstNode{
-		Type:        TableHead{},
+		Type:        &TableHead{},
 		Start:       curCtx.p,
 		End:         curCtx.p,
 		Parent:      curCtx.parent,
@@ -348,7 +348,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 
 	alignType := TableAlign{}
 	alignNode := &AstNode{
-		Type:        TableAlign{},
+		Type:        &TableAlign{},
 		Start:       curCtx.p,
 		End:         curCtx.p,
 		Parent:      tableNode,
@@ -389,7 +389,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 			}
 		}
 	}
-	alignNode.Type = alignType
+	alignNode.Type = &alignType
 	alignNode.End = alignResult.end
 	curCtx.p = alignResult.end
 	curRear += alignResult.sep
@@ -403,7 +403,7 @@ func parseTable(s string, ctx parseContext) *AstNode {
 			break
 		}
 		lineNode := &AstNode{
-			Type:        TableLine{},
+			Type:        &TableLine{},
 			Start:       curCtx.p,
 			End:         curCtx.p,
 			Parent:      tableNode,
@@ -433,7 +433,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	}
 	blkType := QuoteBlock{}
 	node := &AstNode{
-		Type:        QuoteBlock{},
+		Type:        &QuoteBlock{},
 		Start:       ctx.p,
 		End:         ctx.p,
 		Parent:      ctx.parent,
@@ -459,7 +459,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 		blkType.Level += 1
 		i += 1
 	}
-	node.Type = blkType
+	node.Type = &blkType
 	for i < len(s) {
 		if s[i] != ' ' {
 			break
@@ -470,7 +470,7 @@ func parseQuoteBlock(s string, ctx parseContext) *AstNode {
 	var textnode *AstNode
 	if i >= end {
 		textnode = &AstNode{
-			Type:        Text{},
+			Type:        &Text{},
 			Start:       curCtx.p,
 			End:         curCtx.p,
 			Parent:      curCtx.parent,
@@ -510,7 +510,7 @@ func parseHorizontalRule(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        HorizontalRule{},
+		Type:        &HorizontalRule{},
 		Start:       ctx.p,
 		End:         pos,
 		Parent:      ctx.parent,
@@ -530,7 +530,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 		}
 		itemType := ListItem{}
 		node := &AstNode{
-			Type:        ListItem{},
+			Type:        &ListItem{},
 			Start:       ctx.p,
 			End:         ctx.p,
 			Parent:      ctx.parent,
@@ -554,11 +554,11 @@ func parseList(s string, ctx parseContext) *AstNode {
 				return nil
 			}
 			start = dotPos + 1
-			itemType = ListItem{IsOrdered: true, Order: order}
+			itemType = ListItem{IsOrdered: true, Order: uint32(order)}
 		}
 		node.End.ConsumeStr(s[:start])
 		contentStart := node.End
-		node.Type = itemType
+		node.Type = &itemType
 
 		lineBrk := -1
 		text := ""
@@ -586,7 +586,7 @@ func parseList(s string, ctx parseContext) *AstNode {
 
 	listType := List{}
 	listnode := &AstNode{
-		Type:        List{},
+		Type:        &List{},
 		Start:       ctx.p,
 		End:         ctx.p,
 		Parent:      ctx.parent,
@@ -600,10 +600,10 @@ func parseList(s string, ctx parseContext) *AstNode {
 	if fstListItem == nil {
 		return nil
 	}
-	curOrder := fstListItem.Type.(ListItem).Order + 1
-	listType.IsOrdered = fstListItem.Type.(ListItem).IsOrdered
-	listType.IsTask = fstListItem.Type.(ListItem).IsFinished
-	listnode.Type = listType
+	curOrder := fstListItem.Type.(*ListItem).Order + 1
+	listType.IsOrdered = fstListItem.Type.(*ListItem).IsOrdered
+	listType.IsTask = fstListItem.Type.(*ListItem).IsFinished
+	listnode.Type = &listType
 	listnode.Children = append(listnode.Children, fstListItem)
 	curCtx.leftSibling = fstListItem
 	curCtx.p = fstListItem.End
@@ -614,12 +614,12 @@ func parseList(s string, ctx parseContext) *AstNode {
 
 		if lstItem == nil {
 			break
-		} else if lstItem.Type.(ListItem).IsOrdered != listType.IsOrdered {
+		} else if lstItem.Type.(*ListItem).IsOrdered != listType.IsOrdered {
 			break
-		} else if lstItem.Type.(ListItem).IsTask != listType.IsTask {
+		} else if lstItem.Type.(*ListItem).IsTask != listType.IsTask {
 			break
 		} else {
-			lstItemType := lstItem.Type.(ListItem)
+			lstItemType := lstItem.Type.(*ListItem)
 			lstItemType.Order = curOrder
 			lstItem.Type = lstItemType
 
@@ -669,7 +669,7 @@ func parseEmphasis(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        Emphasis{},
+		Type:        &Emphasis{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
@@ -706,7 +706,7 @@ func parseItalic(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        Italic{},
+		Type:        &Italic{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
@@ -744,7 +744,7 @@ func parseStrikeThrough(s string, ctx parseContext) *AstNode {
 	endPos := ctx.p
 	endPos.ConsumeStr(s[:end+1])
 	node := &AstNode{
-		Type:        StrikeThrough{},
+		Type:        &StrikeThrough{},
 		Start:       ctx.p,
 		End:         endPos,
 		Parent:      ctx.parent,
@@ -801,7 +801,7 @@ func parseCode(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        Code{},
+		Type:        &Code{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
@@ -839,7 +839,7 @@ func parseMath(s string, ctx parseContext) *AstNode {
 		return nil
 	}
 	node := &AstNode{
-		Type:        Math{},
+		Type:        &Math{},
 		Start:       ctx.p,
 		End:         curCtx.p,
 		Parent:      ctx.parent,
@@ -954,7 +954,7 @@ func parseLink(s string, ctx parseContext) *AstNode {
 	ret, name, link, title, pos := _parseLinkLike(s, ctx.p)
 	if ret {
 		node := &AstNode{
-			Type:        Link{Link: link, Title: title},
+			Type:        &Link{Link: link, Title: title},
 			Start:       ctx.p,
 			End:         pos,
 			Parent:      ctx.parent,
@@ -989,7 +989,7 @@ func parseSimpleLink(s string, ctx parseContext) *AstNode {
 		endPos := ctx.p
 		endPos.ConsumeStr(s[:rightIdx+1])
 		node := &AstNode{
-			Type:        SimpleLink{Link: link},
+			Type:        &SimpleLink{Link: link},
 			Start:       ctx.p,
 			End:         endPos,
 			Parent:      ctx.parent,
@@ -1028,7 +1028,7 @@ func parseReferenceLink(s string, ctx parseContext) *AstNode {
 	endPos := ctx.p
 	endPos.ConsumeStr(s[:rbr2+1])
 	node := &AstNode{
-		Type:        ReferenceLink{Index: s[lbr2+1 : rbr2]},
+		Type:        &ReferenceLink{Index: s[lbr2+1 : rbr2]},
 		Start:       ctx.p,
 		End:         endPos,
 		Parent:      ctx.parent,
@@ -1077,7 +1077,7 @@ func parseReferenceLinkIndex(s string, ctx parseContext) *AstNode {
 	indexType.Title = title
 
 	node := &AstNode{
-		Type:        indexType,
+		Type:        &indexType,
 		Start:       ctx.p,
 		End:         pos,
 		Parent:      ctx.parent,
@@ -1098,7 +1098,7 @@ func parseFootNote(s string, ctx parseContext) *AstNode {
 	endPos := ctx.p
 	endPos.ConsumeStr(s[:rbr+1])
 	node := &AstNode{
-		Type:        FootNote{Index: index},
+		Type:        &FootNote{Index: index},
 		Start:       ctx.p,
 		End:         endPos,
 		Parent:      ctx.parent,
@@ -1130,7 +1130,7 @@ func parseFootNoteIndex(s string, ctx parseContext) *AstNode {
 		endPos.ConsumeStr(s[:endLine+1])
 	}
 	node := &AstNode{
-		Type:        FootNoteIndex{Index: index},
+		Type:        &FootNoteIndex{Index: index},
 		Start:       ctx.p,
 		End:         endPos,
 		Parent:      ctx.parent,
@@ -1150,7 +1150,7 @@ func parseFootNoteIndex(s string, ctx parseContext) *AstNode {
 		}
 	} else {
 		textnode = &AstNode{
-			Type:        Text{},
+			Type:        &Text{},
 			Start:       textStart,
 			End:         textStart,
 			Parent:      node,
@@ -1168,7 +1168,7 @@ func parseImage(s string, ctx parseContext) *AstNode {
 	ret, name, link, title, pos := _parseLinkLike(s[1:], ctx.p)
 	if ret {
 		node := &AstNode{
-			Type:        Image{Link: link, Title: title},
+			Type:        &Image{Link: link, Title: title},
 			Start:       ctx.p,
 			End:         pos,
 			Parent:      ctx.parent,
@@ -1221,7 +1221,7 @@ func parseHtml(s string, ctx parseContext) *AstNode {
 	pos := ctx.p
 	pos.ConsumeStr(s[:tagEnd+1])
 	node := &AstNode{
-		Type:        HtmlStartTag{Tag: tag, Content: content},
+		Type:        &HtmlStartTag{Tag: tag, Content: content},
 		Start:       ctx.p,
 		End:         pos,
 		Parent:      ctx.parent,
@@ -1231,7 +1231,7 @@ func parseHtml(s string, ctx parseContext) *AstNode {
 		if len(content) > 0 {
 			return nil
 		}
-		node.Type = HtmlEndTag{Tag: tag}
+		node.Type = &HtmlEndTag{Tag: tag}
 	}
 	return node
 }
@@ -1243,7 +1243,7 @@ type MKParser struct {
 
 func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 	node := AstNode{
-		Type:        Text{},
+		Type:        &Text{},
 		Start:       ctx.p,
 		Parent:      ctx.parent,
 		LeftSibling: ctx.leftSibling,
@@ -1285,10 +1285,11 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 		if s[curIdx] != '\n' {
 			break
 		}
-		ctx.p.Consume(rune(s[curIdx]))
+		curCtx.p.Consume(rune(s[curIdx]))
 		curIdx += 1
 	}
-	textStartPos = ctx.p
+	textStartPos = curCtx.p
+	node.Start = curCtx.p
 	if curIdx == len(s) {
 		return nil
 	}
@@ -1338,7 +1339,7 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 					curCtx.leftSibling.End = curCtx.p
 				} else {
 					curCtx.leftSibling = &AstNode{
-						Type:        Text{},
+						Type:        &Text{},
 						Start:       textStartPos,
 						End:         curCtx.p,
 						Parent:      curCtx.parent,
@@ -1373,7 +1374,7 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 		node.Children = nil
 	}
 
-	if node.End.Offset-node.Start.Offset != len(s) {
+	if node.End.Offset-ctx.p.Offset != len(s) {
 		panic("Bug: Text should contain all characters of the string")
 	}
 	return &node
@@ -1381,14 +1382,14 @@ func (parser *MKParser) parseText(s string, ctx parseContext) *AstNode {
 
 func (parser *MKParser) Parse(s string) Ast {
 	ast := Ast{
-		root: AstNode{
-			Type:  Document{},
+		Root: AstNode{
+			Type:  &Document{},
 			Start: Pos{Line: 0, Col: 0, Offset: 0},
 		},
 	}
 	ctx := parseContext{
 		p:           Pos{Line: 0, Col: 0, Offset: 0},
-		parent:      &ast.root,
+		parent:      &ast.Root,
 		leftSibling: nil,
 		parseText:   parser.parseText,
 	}
@@ -1422,7 +1423,7 @@ func (parser *MKParser) Parse(s string) Ast {
 					ctx.p = endPoint
 					break
 				}
-				ast.root.Children = append(ast.root.Children, textnode)
+				ast.Root.Children = append(ast.Root.Children, textnode)
 				ctx.leftSibling = textnode
 				ctx.p = textnode.End
 			}
@@ -1451,8 +1452,8 @@ func (parser *MKParser) Parse(s string) Ast {
 				if subnode.End.Offset <= ctx.p.Offset {
 					panic("Bug: subnode's offset should be larger")
 				}
-				ast.root.LeftSibling = subnode
-				ast.root.Children = append(ast.root.Children, subnode)
+				ast.Root.LeftSibling = subnode
+				ast.Root.Children = append(ast.Root.Children, subnode)
 				ctx.leftSibling = subnode
 				ctx.p = subnode.End
 				textStartPos = ctx.p
@@ -1469,7 +1470,7 @@ func (parser *MKParser) Parse(s string) Ast {
 					textStartPos = ctx.p
 					ctx.p.Consume(c)
 					ctx.leftSibling = &AstNode{
-						Type:        Text{},
+						Type:        &Text{},
 						Start:       textStartPos,
 						End:         ctx.p,
 						Parent:      ctx.parent,
@@ -1493,7 +1494,7 @@ func (parser *MKParser) Parse(s string) Ast {
 	if ctx.p.Offset < len(s) {
 		panic("Bug: parser should read all characters")
 	}
-	ast.root.End = ctx.p
+	ast.Root.End = ctx.p
 
 	return ast
 }
