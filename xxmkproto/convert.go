@@ -13,7 +13,7 @@ func _setWhich(s string, buf *AstNodeTypeProto) {
 
 func _getAstNodeType(buf *AstNodeTypeProto) parserlib.AstNodeType {
 	str := AstNodeTypeEnumProto_name[int32(buf.Which)]
-	intf := reflect.New(reflect.TypeOf(parserlib.Str2NodeType[str]).Elem()).Interface()
+	intf := reflect.New(reflect.TypeOf(parserlib.GetDefaultTypePtr(str)).Elem()).Interface()
 	return intf.(parserlib.AstNodeType)
 }
 

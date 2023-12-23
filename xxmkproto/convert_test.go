@@ -3,9 +3,9 @@ package xxmkproto
 import (
 	"testing"
 
-	"google.golang.org/protobuf/proto"
 	"github.com/XiaoXuan42/xxmk/parserlib"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestPbMarshal(t *testing.T) {
@@ -30,14 +30,7 @@ func TestPbEncDec(t *testing.T) {
 	alignBuf := _astNodeTypeToProtobuf(&align)
 	alignBack := _astNodeTypeFromProtobuf(alignBuf)
 	assert.Equal(t, alignBack, &align)
-
-	for _, v := range parserlib.Str2NodeType {
-		tpProto := _astNodeTypeToProtobuf(v)
-		backV := _astNodeTypeFromProtobuf(tpProto)
-		assert.Equal(t, v, backV)
-	}
 }
-
 
 func TestAstProtoMarshalWithoutErr(t *testing.T) {
 	start := parserlib.Pos{}

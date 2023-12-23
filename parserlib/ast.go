@@ -33,6 +33,11 @@ func (pos *Pos) ConsumeStr(s string) {
 	}
 }
 
+func (pos *Pos) ForwardInlineByInt(cnt int) {
+	pos.Col += cnt
+	pos.Offset += cnt
+}
+
 func (pos *Pos) Back(c rune) {
 	l := utf8.RuneLen(c)
 	pos.Col -= l
@@ -132,4 +137,85 @@ func (ast *Ast) String() string {
 
 func (ast *Ast) Eq(other *Ast) bool {
 	return ast.Root._eq(&other.Root)
+}
+
+type AstIterator struct {
+	Cur *AstNode
+	Ch  int
+}
+
+func (it AstIterator) AstItToRight() AstIterator {
+	if it.Cur == nil {
+		return AstIterator{}
+	}
+	parent := it.Cur.Parent
+	if parent == nil {
+		return AstIterator{}
+	} else if len(parent.Children) <= it.Ch+1 {
+		return AstIterator{}
+	} else {
+		return AstIterator{
+			Cur: parent.Children[it.Ch+1],
+			Ch:  it.Ch + 1,
+		}
+	}
+}
+
+func (it AstIterator) AstItToLeft() AstIterator {
+	if it.Cur == nil {
+		return AstIterator{}
+	}
+	parent := it.Cur.Parent
+	if parent == nil {
+		return AstIterator{}
+	} else if it.Ch <= 0 {
+		return AstIterator{}
+	} else {
+		return AstIterator{
+			Cur: parent.Children[it.Ch-1],
+			Ch:  it.Ch - 1,
+		}
+	}
+}
+
+func (it AstIterator) AstItToFstChild() AstIterator {
+	if it.Cur == nil {
+		return AstIterator{}
+	} else if len(it.Cur.Children) == 0 {
+		return AstIterator{}
+	} else {
+		return AstIterator{
+			Cur: it.Cur.Children[0],
+			Ch:  0,
+		}
+	}
+}
+
+func (it AstIterator) AstFindRightFirstType(targetId int, until *AstNode) AstIterator {
+	failedRes := AstIterator{}
+	if targetId == GetNodeTypeId(it.Cur.Type) {
+		return it
+	}
+	if it.Cur.Parent == nil {
+		return failedRes
+	}
+	for i := it.Ch; i < len(it.Cur.Parent.Children); i++ {
+		curNode := it.Cur.Parent.Children[i]
+		if curNode == until {
+			return failedRes
+		}
+		curId := GetNodeTypeId(curNode.Type)
+		if curId == targetId {
+			return AstIterator{
+				Cur: curNode,
+				Ch:  i,
+			}
+		}
+	}
+	return failedRes
+}
+
+func (it AstIterator) AstFindRightFirstTypeByStr(tp string, until *AstNode) AstIterator {
+	targetId := GetNodeTypeIdFromStr(tp)
+	return it.AstFindRightFirstType(targetId, until)
 }

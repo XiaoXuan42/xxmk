@@ -2,6 +2,8 @@ package parserlib
 
 import (
 	"fmt"
+	"reflect"
+	"sync"
 )
 
 type AstNodeType interface {
@@ -234,7 +236,7 @@ func (html HtmlEndTag) String() string {
 	return fmt.Sprintf("HtmlEndTag(%s)", html.Tag)
 }
 
-var Str2NodeType = map[string]AstNodeType{
+var str2NodeType = map[string]AstNodeType{
 	"Document":           &Document{},
 	"Text":               &Text{},
 	"Header":             &Header{},
@@ -262,4 +264,74 @@ var Str2NodeType = map[string]AstNodeType{
 	"Image":              &Image{},
 	"HtmlStartTag":       &HtmlStartTag{},
 	"HtmlEndTag":         &HtmlEndTag{},
+}
+
+var str2NodeID = map[string]int{
+	"Document":           1,
+	"Text":               2,
+	"Header":             3,
+	"MathBlock":          4,
+	"CodeBlock":          5,
+	"HorizontalRule":     6,
+	"TableHead":          7,
+	"TableAlign":         8,
+	"TableLine":          9,
+	"Table":              10,
+	"QuoteBlock":         11,
+	"List":               12,
+	"ListItem":           13,
+	"Emphasis":           14,
+	"Italic":             15,
+	"StrikeThrough":      16,
+	"Code":               17,
+	"Math":               18,
+	"Link":               19,
+	"SimpleLink":         20,
+	"ReferenceLink":      21,
+	"ReferenceLinkIndex": 22,
+	"FootNote":           23,
+	"FootNoteIndex":      24,
+	"Image":              25,
+	"HtmlStartTag":       26,
+	"HtmlEndTag":         27,
+}
+var str2NodeIDLock sync.RWMutex
+
+func GetNodeTypeName(nodeTp AstNodeType) string {
+	return reflect.TypeOf(nodeTp).Elem().Name()
+}
+
+func GetDefaultTypePtr(key string) AstNodeType {
+	res, ok := str2NodeType[key]
+	if ok {
+		return res
+	} else {
+		return nil
+	}
+}
+
+func GetNodeTypeIdFromStr(key string) int {
+	str2NodeIDLock.RLock()
+
+	val, ok := str2NodeID[key]
+	if !ok {
+		str2NodeIDLock.RUnlock()
+		str2NodeIDLock.Lock()
+		defer str2NodeIDLock.Unlock()
+		val, ok := str2NodeID[key]
+		if ok {
+			return val
+		}
+		id := len(str2NodeID) + 1
+		str2NodeID[key] = id
+		return id
+	} else {
+		str2NodeIDLock.RUnlock()
+		return val
+	}
+}
+
+func GetNodeTypeId(tp AstNodeType) int {
+	tpName := GetNodeTypeName(tp)
+	return GetNodeTypeIdFromStr(tpName)
 }
